@@ -1,8 +1,8 @@
-import nlp from 'compromise';
-import compromiseNumbers from 'compromise-numbers';
+const nlp = require('compromise');
+const compromiseNumbers = require('compromise-numbers');
 nlp.extend(compromiseNumbers);
 
-export class QueryParser {
+class QueryParser {
   parse(query) {
     const doc = nlp(query.toLowerCase());
     const filters = {};
@@ -42,8 +42,11 @@ export class QueryParser {
       filters.status = 'UNDER_CONSTRUCTION';
     }
 
+    console.log('Query filters:', filters);
     return filters;
   }
 }
 
-export const queryParser = new QueryParser();
+const queryParser = new QueryParser();
+
+module.exports = { QueryParser, queryParser };

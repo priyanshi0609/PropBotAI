@@ -1,12 +1,14 @@
-export class SearchEngine {
+class SearchEngine {
   constructor(csvParser) {
     this.csvParser = csvParser;
   }
 
   search(filters) {
     const allData = this.csvParser.getJoinedData();
+    console.log('Total data available:', allData.length);
+    console.log('Applying filters:', filters);
     
-    return allData.filter(property => {
+    const results = allData.filter(property => {
       // Filter by city
       if (filters.city && property.address) {
         const address = property.address.fullAddress || '';
@@ -40,6 +42,9 @@ export class SearchEngine {
 
       return true;
     });
+
+    console.log('Filtered results:', results.length);
+    return results;
   }
 
   generateSummary(results, filters) {
@@ -70,16 +75,19 @@ export class SearchEngine {
       const variant = property.variants[0]; // Take first variant for display
       const config = property.configurations[0];
       
+      const price = variant?.price ? 
+        `₹${(parseFloat(variant.price) / 10000000).toFixed(2)} Cr` : 'Price on request';
+      
       return {
         id: property.project.id,
         title: property.project.projectName || 'Property',
         city: property.address ? (property.address.fullAddress?.split(',').pop()?.trim() || 'Unknown') : 'Unknown',
         locality: property.address?.landmark || 'Various locations',
         bhk: config?.type || config?.customBHK || 'N/A',
-        price: variant?.price ? `₹${(variant.price / 10000000).toFixed(2)} Cr` : 'Price on request',
+        price: price,
         projectName: property.project.projectName,
         status: property.project.status?.replace(/_/g, ' ') || 'Unknown',
-        amenities: ['Parking', 'Lift', 'Security'], // Default amenities
+        amenities: ['Parking', 'Lift', 'Security'],
         slug: property.project.slug || property.project.id,
         carpetArea: variant?.carpetArea ? `${variant.carpetArea} sq.ft` : 'N/A',
         bathrooms: variant?.bathrooms || 'N/A'
@@ -88,4 +96,6 @@ export class SearchEngine {
   }
 }
 
-export const searchEngine = new SearchEngine();
+const searchEngine = new SearchEngine(require('./csvParser').csvParser);
+
+module.exports = { SearchEngine, searchEngine };

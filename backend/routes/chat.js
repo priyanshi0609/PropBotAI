@@ -1,7 +1,7 @@
-import express from 'express';
-import { csvParser } from '../utils/csvParser.js';
-import { queryParser } from '../utils/queryParser.js';
-import { searchEngine } from '../utils/searchEngine.js';
+const express = require('express');
+const { csvParser } = require('../utils/csvParser');
+const { queryParser } = require('../utils/queryParser');
+const { searchEngine } = require('../utils/searchEngine');
 
 const router = express.Router();
 
@@ -16,11 +16,15 @@ router.post('/message', async (req, res) => {
       return res.status(400).json({ error: 'Message is required' });
     }
 
+    console.log('Received message:', message);
+
     // Parse user query
     const filters = queryParser.parse(message);
+    console.log('Parsed filters:', filters);
     
     // Search properties
     const results = searchEngine.search(filters);
+    console.log('Search results:', results.length);
     
     // Generate summary
     const summary = searchEngine.generateSummary(results, filters);
@@ -40,10 +44,10 @@ router.post('/message', async (req, res) => {
     console.error('Chat error:', error);
     res.status(500).json({ 
       success: false,
-      error: 'Internal server error',
+      error: error.message,
       summary: 'Sorry, I encountered an error while processing your request.'
     });
   }
 });
 
-export default router;
+module.exports = router;

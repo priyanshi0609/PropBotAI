@@ -1,6 +1,6 @@
-import express from 'express';
-import cors from 'cors';
-import chatRoutes from './routes/chat.js';
+const express = require('express');
+const cors = require('cors');
+const chatRoutes = require('./routes/chat');
 
 const app = express();
 const PORT = 5000;
