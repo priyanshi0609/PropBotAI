@@ -20,8 +20,19 @@ router.post('/message', async (req, res) => {
 
     // Parse user query
     const filters = queryParser.parse(message);
-    console.log('Parsed filters:', filters);
     
+    // Check if query is relevant
+    if (!queryParser.shouldProcessQuery(filters)) {
+      return res.json({
+        success: true,
+        summary: queryParser.getIrrelevantResponse(message),
+        properties: [],
+        filtersUsed: filters,
+        resultsCount: 0,
+        isIrrelevant: true
+      });
+    }
+
     // Search properties
     const results = searchEngine.search(filters);
     console.log('Search results:', results.length);
