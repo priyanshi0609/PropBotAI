@@ -1,6 +1,6 @@
 const express = require('express');
 const { csvParser } = require('../utils/csvParser');
-const queryParser = require('../utils/parser'); // Fixed import path
+const queryParser = require('../utils/queryParser'); // Fixed import path
 const { searchEngine } = require('../utils/searchEngine');
 
 const router = express.Router();
