@@ -1,6 +1,6 @@
-import React from 'react';
-import ChatInterface from './components/ChatInterFace.jsx';
-import './styles/globals.css';
+import React from "react";
+import "./index.css";
+import ChatInterface from './components/ChatInterFace.jsx'; 
 
 function App() {
   return (
