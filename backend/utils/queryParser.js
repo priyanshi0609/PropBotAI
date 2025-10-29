@@ -58,12 +58,29 @@ class QueryParser {
       return filters;
     }
 
-    // Check for BHK numbers that don't exist in database
+    // **FIX: Check for invalid BHK numbers (0, negative, etc.)**
     const extractedBHK = this.extractExactBHK(normalizedQuery);
+    if (extractedBHK && this.isInvalidBHK(extractedBHK)) {
+      filters.isRelevant = false;
+      filters.invalidBHK = extractedBHK;
+      filters.availableBHKs = this.getAvailableBHKsForDisplay();
+      return filters;
+    }
+
+    // **FIX: Check for BHK numbers that don't exist in database**
     if (extractedBHK && !this.isSupportedBHK(extractedBHK)) {
       filters.isRelevant = false;
       filters.unsupportedBHK = extractedBHK;
       filters.availableBHKs = this.getAvailableBHKsForDisplay();
+      return filters;
+    }
+
+    // **FIX: Check for ambiguous budget (missing units) - STRICTER CHECK**
+    const ambiguousBudget = this.extractAmbiguousBudget(normalizedQuery);
+    if (ambiguousBudget && this.shouldRejectAmbiguousBudget(normalizedQuery, ambiguousBudget)) {
+      filters.isRelevant = false;
+      filters.ambiguousBudget = ambiguousBudget;
+      filters.needsBudgetClarification = true;
       return filters;
     }
 
@@ -80,13 +97,6 @@ class QueryParser {
       }
       filters.bhkRange = bhkRange;
       filters.hasMultipleBHK = true;
-    }
-
-    // Check for ambiguous budget (missing units)
-    const ambiguousBudget = this.extractAmbiguousBudget(normalizedQuery);
-    if (ambiguousBudget) {
-      filters.ambiguousBudget = ambiguousBudget;
-      filters.needsBudgetClarification = true;
     }
 
     // Check if query is too vague
@@ -117,10 +127,13 @@ class QueryParser {
     // City extraction with multiple city support
     filters.city = this.extractExactCity(normalizedQuery);
 
-    // Budget extraction - Handle ambiguous budgets
-    if (!filters.needsBudgetClarification) {
-      const budget = this.extractExactBudget(normalizedQuery);
-      if (budget) filters.maxPrice = budget;
+    // **FIX: Budget extraction - ONLY extract when explicit unit exists**
+    const budget = this.extractExactBudget(normalizedQuery);
+    if (budget) {
+      filters.maxPrice = budget;
+    } else {
+      // **FIX: Don't extract ambiguous budgets for execution**
+      filters.maxPrice = null;
     }
 
     // Status extraction
@@ -137,6 +150,38 @@ class QueryParser {
 
     console.log('🎯 Final filters:', filters);
     return filters;
+  }
+
+  // **NEW: Check for invalid BHK numbers (0, negative, etc.)**
+  isInvalidBHK(bhk) {
+    // Reject 0, negative numbers, and very large numbers
+    if (bhk === '0' || bhk === '-1' || bhk === '00' || parseInt(bhk) > 10) {
+      return true;
+    }
+    return false;
+  }
+
+  // **NEW: Stricter check for ambiguous budgets**
+  shouldRejectAmbiguousBudget(query, ambiguousBudget) {
+    const { amount } = ambiguousBudget;
+    
+    // If amount is too small (like "under 1") without context, reject it
+    if (amount < 5 && !query.includes('cr') && !query.includes('crore')) {
+      return true;
+    }
+    
+    // If amount is a single digit without clear context, reject it
+    if (amount < 10 && !this.hasClearBudgetContext(query)) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  // **NEW: Check if query has clear budget context**
+  hasClearBudgetContext(query) {
+    const budgetKeywords = ['budget', 'price', 'cost', 'worth', 'value', 'amount'];
+    return budgetKeywords.some(keyword => query.includes(keyword));
   }
 
   // Apply fuzzy matching for typos
@@ -254,30 +299,26 @@ class QueryParser {
     return unsupportedCities.some(city => query.includes(city));
   }
 
-  // Enhanced BHK extraction with all supported types
+  // **FIXED: Enhanced BHK extraction with better range handling**
   extractExactBHK(query) {
     console.log('🛏️ Extracting BHK from:', query);
 
+    // **FIX: Extract ranges first**
     const range = this.extractBHKRange(query);
     if (range) {
-      return range.values[0];
+      console.log(`✅ Found BHK range: ${range.values.join('-')}BHK`);
+      return range.values[0]; // Return first BHK for initial filtering
     }
 
     const bhkPatterns = [
+      // **FIX: More specific patterns with word boundaries**
       /\b(\d(?:\.\d)?)\s*bhk\b/i,
       /\b(\d(?:\.\d)?)bhk\b/i,
       /\b(\d(?:\.\d)?)\s*bedroom\b/i,
       /\b(\d(?:\.\d)?)\s*bed\b/i,
-      /\b(\d(?:\.\d)?)\s*b\s*h\s*k\b/i,
-      /\b(\d(?:\.\d)?)\s*b\s*r\b/i,
       /\b(\d)\s*rk\b/i,
       /\b(\d)rk\b/i,
       /\broom\s*kitchen\b/i,
-      /\b(one)\s*bhk\b/i,
-      /\b(two)\s*bhk\b/i,
-      /\b(three)\s*bhk\b/i,
-      /\b(four)\s*bhk\b/i,
-      /\b(five)\s*bhk\b/i,
     ];
 
     for (const pattern of bhkPatterns) {
@@ -285,14 +326,7 @@ class QueryParser {
       if (match) {
         let bhk = match[1];
         
-        if (isNaN(bhk)) {
-          const numberMap = {
-            'one': '1', 'two': '2', 'three': '3', 
-            'four': '4', 'five': '5'
-          };
-          bhk = numberMap[bhk.toLowerCase()] || bhk;
-        }
-
+        // **FIX: Handle 1RK specifically**
         if (query.includes('rk') || query.includes('room kitchen')) {
           return '1RK';
         }
@@ -302,33 +336,28 @@ class QueryParser {
       }
     }
 
+    // **FIX: Don't extract standalone numbers without BHK context**
     return null;
   }
 
-  // Enhanced BHK range extraction
+  // **FIXED: Enhanced BHK range extraction**
   extractBHKRange(query) {
     const rangePatterns = [
-      /(\d(?:\.\d)?)\s*(?:-|to|–)\s*(\d(?:\.\d)?)\s*bhk/i,
-      /(\d(?:\.\d)?)\s*(?:\/|or)\s*(\d(?:\.\d)?)\s*bhk/i,
-      /(\d(?:\.\d)?)\s*bhk\s*(?:or|\/)\s*(\d(?:\.\d)?)\s*bhk/i,
-      /(1rk|1bhk)\s*(?:or|\/)\s*(1rk|1bhk)/i
+      // **FIX: More specific range patterns**
+      /\b(\d)\s*(?:-|to|–)\s*(\d)\s*bhk\b/i,
+      /\b(\d)\s*(?:\/|or)\s*(\d)\s*bhk\b/i,
+      /\b(\d)\s*bhk\s*(?:or|\/)\s*(\d)\s*bhk\b/i,
     ];
 
     for (const pattern of rangePatterns) {
       const match = query.match(pattern);
       if (match) {
-        let bhks = [];
+        const bhks = [match[1], match[2]].filter(bhk => 
+          this.isSupportedBHK(bhk)
+        );
         
-        if (match[1].includes('rk') || match[2].includes('rk')) {
-          if (match[1].includes('rk') || match[1].includes('1')) bhks.push('1RK');
-          if (match[2].includes('rk') || match[2].includes('1')) bhks.push('1');
-        } else {
-          bhks = [match[1], match[2]].filter(bhk => 
-            this.isSupportedBHK(bhk)
-          );
-        }
-        
-        if (bhks.length > 0) {
+        if (bhks.length >= 2) {
+          console.log(`✅ Found valid BHK range: ${bhks.join('-')}BHK`);
           return {
             isRange: true,
             values: bhks,
@@ -372,6 +401,40 @@ class QueryParser {
       }
     }
 
+    return null;
+  }
+
+  // **FIXED: STRICT Budget extraction - ONLY with explicit units**
+  extractExactBudget(query) {
+    console.log('💰 Extracting budget from:', query);
+    
+    const budgetPatterns = [
+      // **FIX: Require explicit units for ALL patterns**
+      /(?:under|below|less than|upto|within|max|maximum)\s*₹?\s*(\d+(?:\.\d+)?)\s*(lakh|lac|cr|crore)\b/i,
+      /₹?\s*(\d+(?:\.\d+)?)\s*(lakh|lac|cr|crore)\b/i,
+      /budget\s*₹?\s*(\d+(?:\.\d+)?)\s*(lakh|lac|cr|crore)\b/i,
+      /\b(\d+(?:\.\d+)?)\s*(lakh|lac|cr|crore)\b/i,
+    ];
+
+    for (const pattern of budgetPatterns) {
+      const match = query.match(pattern);
+      if (match) {
+        let amount = parseFloat(match[1]);
+        let unit = match[2].toLowerCase();
+
+        if (unit.includes('cr') || unit.includes('crore')) {
+          const maxPrice = Math.floor(amount * 10000000);
+          console.log(`💰 Found budget: ${amount} ${unit} -> ₹${maxPrice}`);
+          return maxPrice;
+        } else if (unit.includes('lakh') || unit.includes('lac')) {
+          const maxPrice = Math.floor(amount * 100000);
+          console.log(`💰 Found budget: ${amount} ${unit} -> ₹${maxPrice}`);
+          return maxPrice;
+        }
+      }
+    }
+
+    console.log('❌ No valid budget found (missing explicit unit)');
     return null;
   }
 
@@ -503,39 +566,6 @@ class QueryParser {
            query.match(/(?:budget|price|cost).*\d+/i);
   }
 
-  // EXACT Budget extraction - ONLY with explicit units
-  extractExactBudget(query) {
-    console.log('💰 Extracting budget from:', query);
-    
-    const budgetPatterns = [
-      /(?:under|below|less than|upto|within|max|maximum)\s*₹?\s*(\d+(?:\.\d+)?)\s*(cr|lakh|lac|crore)\b/i,
-      /₹?\s*(\d+(?:\.\d+)?)\s*(cr|lakh|lac|crore)\b/i,
-      /budget\s*₹?\s*(\d+(?:\.\d+)?)\s*(cr|lakh|lac)/i,
-      /\b(\d+(?:\.\d+)?)\s*(lakh|lac|cr|crore)\b/i,
-    ];
-
-    for (const pattern of budgetPatterns) {
-      const match = query.match(pattern);
-      if (match) {
-        let amount = parseFloat(match[1]);
-        let unit = match[2].toLowerCase();
-
-        if (unit.includes('cr') || unit.includes('crore')) {
-          const maxPrice = Math.floor(amount * 10000000);
-          console.log(`💰 Found budget: ${amount} ${unit} -> ₹${maxPrice}`);
-          return maxPrice;
-        } else if (unit.includes('lakh') || unit.includes('lac')) {
-          const maxPrice = Math.floor(amount * 100000);
-          console.log(`💰 Found budget: ${amount} ${unit} -> ₹${maxPrice}`);
-          return maxPrice;
-        }
-      }
-    }
-
-    console.log('❌ No valid budget found (missing explicit unit)');
-    return null;
-  }
-
   // Status extraction
   extractExactStatus(query) {
     if (query.match(/\b(ready|possession|move in|rtm|ready to move|immediate possession)\b/i)) {
@@ -573,6 +603,12 @@ class QueryParser {
 
   // ENHANCED: Generate appropriate response for all edge cases
   getIrrelevantResponse(query, filters = {}) {
+    // Invalid BHK numbers (0, negative, etc.)
+    if (filters.invalidBHK) {
+      const availableBHKs = this.getAvailableBHKsForDisplay();
+      return `I only handle properties with ${availableBHKs.join(', ')} configurations. ${filters.invalidBHK}BHK is not a valid configuration. Please search for available BHK types.`;
+    }
+
     // Unsupported BHK numbers
     if (filters.unsupportedBHK) {
       const availableBHKs = filters.availableBHKs || this.getAvailableBHKsForDisplay();
@@ -582,6 +618,12 @@ class QueryParser {
     // Unsupported cities
     if (filters.unsupportedCity) {
       return `I specialize only in properties in Pune and Mumbai. I don't have information about properties in ${filters.detectedCity}. Would you like to search for properties in Pune or Mumbai instead?`;
+    }
+
+    // Ambiguous budget
+    if (filters.needsBudgetClarification && filters.ambiguousBudget) {
+      const { amount, likelyUnit } = filters.ambiguousBudget;
+      return `I see you mentioned a budget of ${amount}, but you didn't specify the unit. Did you mean ${amount} ${likelyUnit}? Please specify the unit (Lakh or Cr) for accurate results, like "under ${amount} ${likelyUnit}".`;
     }
 
     // Vague queries with specific guidance
@@ -600,12 +642,6 @@ class QueryParser {
     if (filters.multipleQueries) {
       const availableBHKs = this.getAvailableBHKsForDisplay();
       return `I can handle one search at a time to give you the best results. Available BHKs: ${availableBHKs.join(', ')}. Please try one search query, like '2BHK in Pune' or '3BHK in Mumbai under 1.2 Cr'.`;
-    }
-
-    // Ambiguous budget
-    if (filters.needsBudgetClarification && filters.ambiguousBudget) {
-      const { amount, likelyUnit } = filters.ambiguousBudget;
-      return `I see you mentioned a budget of ${amount}. Did you mean ${amount} ${likelyUnit}? Please specify the unit (Lakh or Cr) for accurate results, like "under ${amount} ${likelyUnit}".`;
     }
 
     // Clearly irrelevant queries
