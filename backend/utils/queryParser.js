@@ -5,12 +5,14 @@ class QueryParser {
     
     console.log('🔍 Parsing query:', cleanQuery);
 
-    // Enhanced property intent detection
+    // Enhanced property intent detection with better coverage
     const propertyKeywords = [
       'bhk', 'flat', 'apartment', 'house', 'property', 'properties',
       'home', 'residential', 'commercial', 'buy', 'purchase', 'find',
       'search', 'looking', 'need', 'want', 'show', 'list', 'room',
-      'residence', 'unit', 'accommodation', 'living space'
+      'residence', 'unit', 'accommodation', 'living space', 'plot',
+      'villa', 'builder', 'construction', 'possession', 'sale',
+      'rent', 'lease', 'investment', 'real estate', 'broker', 'agent'
     ];
 
     const hasPropertyIntent = propertyKeywords.some(keyword => 
@@ -27,10 +29,28 @@ class QueryParser {
       return filters;
     }
 
-    // If no clear property intent and no city/budget, mark as irrelevant
+    // Enhanced irrelevant query detection
     if (!hasPropertyIntent && !hasCityIntent && !hasBudgetIntent) {
-      filters.isRelevant = false;
-      return filters;
+      // Check for common non-property queries
+      if (this.isClearlyNonPropertyQuery(cleanQuery)) {
+        filters.isRelevant = false;
+        filters.queryType = 'non-property';
+        return filters;
+      }
+      
+      // Check for greetings and casual conversation
+      if (this.isCasualGreeting(cleanQuery)) {
+        filters.isRelevant = false;
+        filters.queryType = 'greeting';
+        return filters;
+      }
+      
+      // Check for technical/other questions
+      if (this.isTechnicalQuery(cleanQuery)) {
+        filters.isRelevant = false;
+        filters.queryType = 'technical';
+        return filters;
+      }
     }
 
     filters.isRelevant = true;
@@ -53,6 +73,58 @@ class QueryParser {
 
     console.log('🎯 Final filters:', filters);
     return filters;
+  }
+
+  // Enhanced irrelevant query detection
+  isClearlyNonPropertyQuery(query) {
+    const nonPropertyPatterns = [
+      /(weather|temperature|forecast)/i,
+      /(news|headlines|update)/i,
+      /(joke|funny|humor)/i,
+      /(time|date|day)/i,
+      /(calculate|math|addition)/i,
+      /(movie|film|entertainment)/i,
+      /(sport|game|player)/i,
+      /(music|song|artist)/i,
+      /(food|restaurant|recipe)/i,
+      /(travel|tourist|hotel)/i,
+      /(health|doctor|medical)/i,
+      /(education|school|college)/i,
+      /(politics|government|election)/i,
+      /(technology|computer|software)/i,
+      /(who is|what is|when is)/i,
+      /(how to|why should|where can)/i
+    ];
+    
+    return nonPropertyPatterns.some(pattern => pattern.test(query));
+  }
+
+  // Detect casual greetings and conversation
+  isCasualGreeting(query) {
+    const greetingPatterns = [
+      /^(hi|hello|hey|greetings|good morning|good afternoon|good evening)/i,
+      /^(how are you|how do you do|what's up|sup)/i,
+      /^(thank you|thanks|appreciate)/i,
+      /^(bye|goodbye|see you|farewell)/i,
+      /^(yes|no|maybe|ok|okay)/i,
+      /^(your name|who are you|what are you)/i
+    ];
+    
+    return greetingPatterns.some(pattern => pattern.test(query));
+  }
+
+  // Detect technical or other non-property questions
+  isTechnicalQuery(query) {
+    const technicalPatterns = [
+      /(how.*work|how.*built|how.*made)/i,
+      /(what.*language|what.*technology)/i,
+      /(api|endpoint|server|database)/i,
+      /(code|programming|developer)/i,
+      /(bug|error|issue|problem)/i,
+      /(feature|update|upgrade)/i
+    ];
+    
+    return technicalPatterns.some(pattern => pattern.test(query));
   }
 
   // ULTRA ACCURATE BHK extraction - FIXED ALL EDGE CASES
@@ -349,7 +421,9 @@ class QueryParser {
   hasUnsupportedCities(query) {
     const unsupportedCities = [
       'delhi', 'bangalore', 'hyderabad', 'chennai', 'kolkata',
-      'ahmedabad', 'surat', 'jaipur', 'lucknow', 'kanpur'
+      'ahmedabad', 'surat', 'jaipur', 'lucknow', 'kanpur',
+      'noida', 'gurgaon', 'faridabad', 'ghaziabad', 'indore',
+      'bhopal', 'nagpur', 'kochi', 'coimbatore', 'visakhapatnam'
     ];
     return unsupportedCities.some(city => query.includes(city));
   }
@@ -359,19 +433,46 @@ class QueryParser {
     return filters.isRelevant !== false;
   }
 
-  // Generate appropriate response for irrelevant queries
+  // ENHANCED: Generate appropriate response for irrelevant queries
   getIrrelevantResponse(query, filters = {}) {
     if (filters.unsupportedCity) {
-      return "I specialize only in properties in Pune and Mumbai. I cannot help with properties in other cities. Please search for properties in Pune or Mumbai.";
+      const otherCityResponses = [
+        "I specialize only in properties in Pune and Mumbai. While I can't help with properties in other cities, I'd be happy to assist you with finding the perfect home in Pune or Mumbai!",
+        "My expertise is focused on the Pune and Mumbai property markets. I don't have information about other cities, but I can help you explore great options in Pune or Mumbai.",
+        "I'm your dedicated assistant for Pune and Mumbai properties. For other cities, you might want to check local real estate portals. Meanwhile, I can show you some amazing properties in Pune or Mumbai!"
+      ];
+      return otherCityResponses[Math.floor(Math.random() * otherCityResponses.length)];
     }
 
-    const responses = [
-      "I'm an intelligent assistant specialized in properties in Pune and Mumbai. I have no expertise about your current question. Try asking me about flats, BHKs, or properties in these cities!",
-      "I specialize exclusively in property search for Pune and Mumbai. I don't have knowledge about other topics. Ask me about 2BHK flats, properties under ₹1 Cr, or ready-to-move homes in these cities!",
-      "My expertise is limited to properties in Pune and Mumbai. I can't help with other questions. Try: '3BHK in Pune under ₹1.2 Cr' or 'Ready flats in Mumbai'"
+    // Handle different types of irrelevant queries
+    if (filters.queryType === 'greeting') {
+      const greetingResponses = [
+        "Hello! I'm your PropBot AI assistant specializing in Pune and Mumbai properties. How can I help you find your dream home today?",
+        "Hi there! I'm here to help you discover the perfect property in Pune or Mumbai. What are you looking for?",
+        "Welcome! I specialize in property search across Pune and Mumbai. Feel free to ask me about flats, budgets, or locations!"
+      ];
+      return greetingResponses[Math.floor(Math.random() * greetingResponses.length)];
+    }
+
+    if (filters.queryType === 'technical') {
+      const technicalResponses = [
+        "I'm focused on helping you find properties in Pune and Mumbai. For technical questions about how I work, please contact our support team!",
+        "As a property search assistant, I specialize in finding homes in Pune and Mumbai. For technical inquiries, our engineering team would be happy to help!",
+        "I'm here to assist with your property search in Pune and Mumbai. For technical details about the platform, please reach out to our support team."
+      ];
+      return technicalResponses[Math.floor(Math.random() * technicalResponses.length)];
+    }
+
+    // General irrelevant queries
+    const generalResponses = [
+      "I'm your intelligent property assistant for Pune and Mumbai! I specialize in helping you find flats, apartments, and homes in these cities. Try asking me about specific BHK requirements, budgets, or locations within Pune or Mumbai.",
+      "I live and breathe Pune and Mumbai properties! While I don't have expertise in other topics, I'd love to help you find your dream home. Try: '2BHK under ₹80 Lakh in Pune' or 'Ready to move flats in Mumbai'.",
+      "As your dedicated property search assistant for Pune and Mumbai, I'm here to help you find the perfect home. Ask me about BHK configurations, budgets, locations, or property status in these cities!",
+      "I'm specialized in Pune and Mumbai real estate. Let me help you navigate the property market in these cities! You can ask about flats, budgets, locations, or specific requirements like '3BHK ready to move in Hinjewadi'.",
+      "Welcome to your Pune-Mumbai property expert! I'm here to make your property search easy. Try queries like 'Properties under ₹1 Cr', '2BHK in Kharadi', or 'Ready to move apartments in Andheri'."
     ];
     
-    return responses[Math.floor(Math.random() * responses.length)];
+    return generalResponses[Math.floor(Math.random() * generalResponses.length)];
   }
 }
 
