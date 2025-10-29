@@ -19,6 +19,25 @@ app.use((req, res, next) => {
 // Routes
 app.use('/api/chat', chatRoutes);
 
+// Base /api/chat endpoint handler
+app.get('/api/chat', (req, res) => {
+  res.json({
+    success: true,
+    message: 'PropBot AI Chat API',
+    available_endpoints: {
+      message: 'POST /api/chat/message - Send chat messages',
+      test: 'GET /api/chat/test - Test endpoint'
+    },
+    usage: 'Send POST requests to /api/chat/message with { "message": "your query" }',
+    examples: [
+      '2BHK in Pune under 80 Lakh',
+      '3BHK flats in Mumbai under 1.2 Cr',
+      'Ready to move 1BHK in Pune'
+    ],
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ 
@@ -38,6 +57,8 @@ app.get('/api', (req, res) => {
     endpoints: {
       health: '/health',
       chat: '/api/chat/message',
+      chat_base: '/api/chat',
+      chat_test: '/api/chat/test',
       docs: '/api-docs'
     }
   });
@@ -65,7 +86,7 @@ const swaggerDocument = {
       description: 'Development server'
     },
     {
-      url: 'https://api.propbot.ai',
+      url: 'https://propbotai-production.up.railway.app',
       description: 'Production server'
     }
   ],
@@ -412,6 +433,67 @@ const swaggerDocument = {
           }
         }
       }
+    },
+    '/api/chat': {
+      get: {
+        summary: 'Chat API information',
+        description: 'Get information about available chat endpoints',
+        tags: ['Chat'],
+        responses: {
+          '200': {
+            description: 'Chat API information',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: {
+                      type: 'boolean',
+                      example: true
+                    },
+                    message: {
+                      type: 'string',
+                      example: 'PropBot AI Chat API'
+                    },
+                    available_endpoints: {
+                      type: 'object',
+                      properties: {
+                        message: {
+                          type: 'string',
+                          example: 'POST /api/chat/message - Send chat messages'
+                        },
+                        test: {
+                          type: 'string',
+                          example: 'GET /api/chat/test - Test endpoint'
+                        }
+                      }
+                    },
+                    usage: {
+                      type: 'string',
+                      example: 'Send POST requests to /api/chat/message with { "message": "your query" }'
+                    },
+                    examples: {
+                      type: 'array',
+                      items: {
+                        type: 'string'
+                      },
+                      example: [
+                        '2BHK in Pune under 80 Lakh',
+                        '3BHK flats in Mumbai under 1.2 Cr',
+                        'Ready to move 1BHK in Pune'
+                      ]
+                    },
+                    timestamp: {
+                      type: 'string',
+                      format: 'date-time'
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   tags: [
@@ -538,12 +620,13 @@ app.get('/', (req, res) => {
     message: '🚀 PropBot AI Backend is running!',
     description: 'Intelligent Property Search API for Pune and Mumbai',
     version: '1.0.0',
-    documentation: `Visit http://localhost:${PORT}/api-docs for interactive API documentation`,
+    documentation: `Visit https://propbotai-production.up.railway.app/api-docs for interactive API documentation`,
     endpoints: {
       root: '/',
       health: '/health',
       api_info: '/api',
       chat: '/api/chat/message',
+      chat_base: '/api/chat',
       chat_test: '/api/chat/test',
       swagger_ui: '/api-docs'
     },
@@ -594,6 +677,7 @@ app.use('*', (req, res) => {
       health: '/health',
       api_info: '/api',
       chat: '/api/chat/message',
+      chat_base: '/api/chat',
       chat_test: '/api/chat/test',
       docs: '/api-docs'
     },
@@ -606,16 +690,18 @@ app.listen(PORT, () => {
   console.log(`\n✨ ========================================`);
   console.log(`   🚀 PropBot AI API Server Started`);
   console.log(`   📍 Port: ${PORT}`);
-  console.log(`   🌐 Environment: Development`);
+  console.log(`   🌐 Environment: Production`);
+  console.log(`   🔗 URL: https://propbotai-production.up.railway.app`);
   console.log(`✨ ========================================\n`);
   
   console.log(`📚 API Documentation:`);
-  console.log(`   🔗 http://localhost:${PORT}/api-docs\n`);
+  console.log(`   🔗 https://propbotai-production.up.railway.app/api-docs\n`);
   
   console.log(`🔍 Test Endpoints:`);
-  console.log(`   ✅ Health Check: http://localhost:${PORT}/health`);
-  console.log(`   💬 Chat Test: http://localhost:${PORT}/api/chat/test`);
-  console.log(`   🏠 API Info: http://localhost:${PORT}/api\n`);
+  console.log(`   ✅ Health Check: https://propbotai-production.up.railway.app/health`);
+  console.log(`   💬 Chat Base: https://propbotai-production.up.railway.app/api/chat`);
+  console.log(`   💬 Chat Test: https://propbotai-production.up.railway.app/api/chat/test`);
+  console.log(`   🏠 API Info: https://propbotai-production.up.railway.app/api\n`);
   
   console.log(`💡 Example Queries for Testing:`);
   console.log(`   🏠 "2BHK in Pune under 80 Lakh"`);
