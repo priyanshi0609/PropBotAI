@@ -291,4 +291,5 @@ class QueryParser {
 
 const queryParser = new QueryParser();
 
-module.exports = { QueryParser, queryParser };
+module.exports = new QueryParser();
+
