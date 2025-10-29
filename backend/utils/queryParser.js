@@ -273,6 +273,11 @@ class QueryParser {
     return unsupportedCities.some(city => query.includes(city));
   }
 
+  // ADD THIS MISSING FUNCTION - FIXES THE ERROR
+  shouldProcessQuery(filters) {
+    return filters.isRelevant !== false;
+  }
+
   // Generate appropriate response for irrelevant queries
   getIrrelevantResponse(query, filters = {}) {
     if (filters.unsupportedCity) {
@@ -289,7 +294,7 @@ class QueryParser {
   }
 }
 
+// Create instance and export properly
 const queryParser = new QueryParser();
 
-module.exports = new QueryParser();
-
+module.exports = queryParser;

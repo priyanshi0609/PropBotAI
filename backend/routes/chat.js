@@ -1,7 +1,6 @@
 const express = require('express');
 const { csvParser } = require('../utils/csvParser');
-const queryParser = require('../utils/queryParser');
-
+const queryParser = require('../utils/parser'); // Fixed import path
 const { searchEngine } = require('../utils/searchEngine');
 
 const router = express.Router();
@@ -50,11 +49,11 @@ router.post('/message', async (req, res) => {
     // Parse user query
     const filters = queryParser.parse(message);
     
-    // Check if query is relevant
+    // Check if query is relevant - FIXED: Use the instance method
     if (!queryParser.shouldProcessQuery(filters)) {
       return res.json({
         success: true,
-        summary: queryParser.getIrrelevantResponse(message),
+        summary: queryParser.getIrrelevantResponse(message, filters),
         properties: [],
         filtersUsed: filters,
         resultsCount: 0,
