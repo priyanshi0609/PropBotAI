@@ -1,20 +1,639 @@
 const express = require('express');
 const cors = require('cors');
 const chatRoutes = require('./routes/chat');
+const swaggerUi = require('swagger-ui-express');
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
+// Middleware
 app.use(cors());
 app.use(express.json());
+
+// Request logging middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  next();
+});
 
 // Routes
 app.use('/api/chat', chatRoutes);
 
-app.get('/', (req, res) => {
-  res.json({ message: 'PropBot AI Backend is running!' });
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    message: 'PropBot AI API is running',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0'
+  });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+// API info endpoint
+app.get('/api', (req, res) => {
+  res.json({
+    name: 'PropBot AI API',
+    version: '1.0.0',
+    description: 'Intelligent Property Search API for Pune and Mumbai',
+    endpoints: {
+      health: '/health',
+      chat: '/api/chat/message',
+      docs: '/api-docs'
+    }
+  });
 });
+
+// Swagger documentation
+const swaggerDocument = {
+  openapi: '3.0.0',
+  info: {
+    title: 'PropBot AI API',
+    description: 'Intelligent Property Search API for Pune and Mumbai. This API processes natural language property search queries and returns matching properties with detailed information.',
+    version: '1.0.0',
+    contact: {
+      name: 'API Support',
+      email: 'support@propbot.ai'
+    },
+    license: {
+      name: 'MIT',
+      url: 'https://opensource.org/licenses/MIT'
+    }
+  },
+  servers: [
+    {
+      url: `http://localhost:${PORT}`,
+      description: 'Development server'
+    },
+    {
+      url: 'https://api.propbot.ai',
+      description: 'Production server'
+    }
+  ],
+  paths: {
+    '/api/chat/message': {
+      post: {
+        summary: 'Send a property search query',
+        description: 'Process natural language property search queries and return matching properties from Pune and Mumbai with exact filtering for BHK, budget, location, and status.',
+        tags: ['Chat'],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['message'],
+                properties: {
+                  message: {
+                    type: 'string',
+                    example: '2BHK flats in Pune under 80 Lakh',
+                    description: 'Natural language property search query. Supports BHK, budget, city, and status filters.'
+                  }
+                }
+              },
+              examples: {
+                basicSearch: {
+                  summary: 'Basic property search',
+                  value: {
+                    message: '2BHK in Pune under 80 Lakh'
+                  }
+                },
+                readyToMove: {
+                  summary: 'Ready to move properties',
+                  value: {
+                    message: 'Ready to move 3BHK in Mumbai under 1.2 Cr'
+                  }
+                },
+                underConstruction: {
+                  summary: 'Under construction properties',
+                  value: {
+                    message: 'Under construction 1BHK in Pune'
+                  }
+                },
+                budgetOnly: {
+                  summary: 'Budget only search',
+                  value: {
+                    message: 'Properties under 1 Cr in Mumbai'
+                  }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          '200': {
+            description: 'Successful response with exact property matches',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: {
+                      type: 'boolean',
+                      example: true
+                    },
+                    summary: {
+                      type: 'string',
+                      example: 'Found 3 2BHK properties in Pune under ₹80 Lakh. 2 are ready to move and 1 is under construction. Popular areas include Model Colony, Shivajinagar.',
+                      description: 'AI-generated summary of search results'
+                    },
+                    properties: {
+                      type: 'array',
+                      description: 'List of matching properties with exact filters applied',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: {
+                            type: 'string',
+                            example: 'cmf5r6hv20005vxpt3yfnl2qp',
+                            description: 'Unique property identifier'
+                          },
+                          title: {
+                            type: 'string',
+                            example: 'Pristine02',
+                            description: 'Property title/name'
+                          },
+                          city: {
+                            type: 'string',
+                            example: 'Pune',
+                            description: 'City where property is located'
+                          },
+                          locality: {
+                            type: 'string',
+                            example: 'Model Colony',
+                            description: 'Locality/area within the city'
+                          },
+                          bhk: {
+                            type: 'string',
+                            example: '2BHK',
+                            description: 'Exact BHK configuration'
+                          },
+                          price: {
+                            type: 'string',
+                            example: '₹80 L',
+                            description: 'Formatted price (₹X Cr / ₹X L)'
+                          },
+                          projectName: {
+                            type: 'string',
+                            example: 'Pristine02',
+                            description: 'Name of the project'
+                          },
+                          status: {
+                            type: 'string',
+                            example: 'Ready',
+                            enum: ['Ready', 'Under Construction', 'Unknown'],
+                            description: 'Possession status'
+                          },
+                          amenities: {
+                            type: 'array',
+                            items: {
+                              type: 'string'
+                            },
+                            example: ['Parking', 'Lift', 'Security'],
+                            description: 'Top 2-3 amenities'
+                          },
+                          ctaUrl: {
+                            type: 'string',
+                            example: '/project/pristine02-modelcolony-shivajinagar-pune-428955',
+                            description: 'Call-to-action URL for property details'
+                          },
+                          carpetArea: {
+                            type: 'string',
+                            example: '188.73 sq.ft',
+                            description: 'Carpet area of the property'
+                          },
+                          bathrooms: {
+                            type: 'string',
+                            example: '2',
+                            description: 'Number of bathrooms'
+                          }
+                        }
+                      }
+                    },
+                    filtersUsed: {
+                      type: 'object',
+                      description: 'Filters extracted from the query',
+                      example: {
+                        bhk: '2',
+                        city: 'pune',
+                        maxPrice: 8000000,
+                        status: 'READY_TO_MOVE'
+                      }
+                    },
+                    resultsCount: {
+                      type: 'integer',
+                      example: 3,
+                      description: 'Number of properties found'
+                    }
+                  }
+                },
+                examples: {
+                  success: {
+                    summary: 'Successful property search',
+                    value: {
+                      success: true,
+                      summary: 'Found 3 2BHK properties in Pune under ₹80 Lakh. 2 are ready to move and 1 is under construction. Popular areas include Model Colony, Shivajinagar.',
+                      properties: [
+                        {
+                          id: 'cmf5r6hv20005vxpt3yfnl2qp',
+                          title: 'Pristine02',
+                          city: 'Pune',
+                          locality: 'Model Colony',
+                          bhk: '2BHK',
+                          price: '₹80 L',
+                          projectName: 'Pristine02',
+                          status: 'Ready',
+                          amenities: ['Parking', 'Lift', 'Security'],
+                          ctaUrl: '/project/pristine02-modelcolony-shivajinagar-pune-428955',
+                          carpetArea: '188.73 sq.ft',
+                          bathrooms: '2'
+                        }
+                      ],
+                      filtersUsed: {
+                        bhk: '2',
+                        city: 'pune',
+                        maxPrice: 8000000
+                      },
+                      resultsCount: 3
+                    }
+                  },
+                  noResults: {
+                    summary: 'No properties found',
+                    value: {
+                      success: true,
+                      summary: 'No 3BHK properties found in Mumbai under ₹60 Lakh. Try increasing your budget or checking different locations.',
+                      properties: [],
+                      filtersUsed: {
+                        bhk: '3',
+                        city: 'mumbai',
+                        maxPrice: 6000000
+                      },
+                      resultsCount: 0
+                    }
+                  },
+                  irrelevant: {
+                    summary: 'Irrelevant query',
+                    value: {
+                      success: true,
+                      summary: "I'm an intelligent assistant specialized in properties in Pune and Mumbai. I have no expertise about your current question. Try asking me about flats, BHKs, or properties in these cities!",
+                      properties: [],
+                      filtersUsed: {
+                        isRelevant: false
+                      },
+                      resultsCount: 0,
+                      isIrrelevant: true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          '400': {
+            description: 'Bad request - message is required',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: {
+                      type: 'boolean',
+                      example: false
+                    },
+                    error: {
+                      type: 'string',
+                      example: 'Message is required'
+                    }
+                  }
+                }
+              }
+            }
+          },
+          '500': {
+            description: 'Internal server error',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: {
+                      type: 'boolean',
+                      example: false
+                    },
+                    error: {
+                      type: 'string',
+                      example: 'Internal server error occurred'
+                    },
+                    summary: {
+                      type: 'string',
+                      example: 'Sorry, I encountered an error while processing your request.'
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    '/health': {
+      get: {
+        summary: 'Health check',
+        description: 'Check if the API is running properly and data is loaded',
+        tags: ['Health'],
+        responses: {
+          '200': {
+            description: 'API is healthy and ready',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    status: {
+                      type: 'string',
+                      example: 'OK'
+                    },
+                    message: {
+                      type: 'string',
+                      example: 'PropBot AI API is running'
+                    },
+                    timestamp: {
+                      type: 'string',
+                      format: 'date-time'
+                    },
+                    version: {
+                      type: 'string',
+                      example: '1.0.0'
+                    },
+                    dataLoaded: {
+                      type: 'boolean',
+                      example: true,
+                      description: 'Whether property data is successfully loaded'
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    '/api/chat/test': {
+      get: {
+        summary: 'Test chat endpoint',
+        description: 'Verify that the chat route is working and check data loading status',
+        tags: ['Chat'],
+        responses: {
+          '200': {
+            description: 'Chat endpoint is working',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: {
+                      type: 'boolean',
+                      example: true
+                    },
+                    message: {
+                      type: 'string',
+                      example: 'Chat API is working!'
+                    },
+                    dataLoaded: {
+                      type: 'boolean',
+                      example: true
+                    },
+                    timestamp: {
+                      type: 'string',
+                      format: 'date-time'
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  tags: [
+    {
+      name: 'Chat',
+      description: 'Property search chat endpoints with natural language processing'
+    },
+    {
+      name: 'Health',
+      description: 'API health and status endpoints'
+    }
+  ],
+  components: {
+    schemas: {
+      Property: {
+        type: 'object',
+        properties: {
+          id: {
+            type: 'string',
+            description: 'Unique property identifier'
+          },
+          title: {
+            type: 'string',
+            description: 'Property title/name'
+          },
+          city: {
+            type: 'string',
+            enum: ['Pune', 'Mumbai'],
+            description: 'City location'
+          },
+          locality: {
+            type: 'string',
+            description: 'Locality/area within city'
+          },
+          bhk: {
+            type: 'string',
+            description: 'BHK configuration (1BHK, 2BHK, 3BHK, etc.)'
+          },
+          price: {
+            type: 'string',
+            description: 'Formatted price in ₹ Cr or ₹ L'
+          },
+          projectName: {
+            type: 'string',
+            description: 'Project name'
+          },
+          status: {
+            type: 'string',
+            enum: ['Ready', 'Under Construction', 'Unknown'],
+            description: 'Possession status'
+          },
+          amenities: {
+            type: 'array',
+            items: {
+              type: 'string'
+            },
+            description: 'Top amenities'
+          },
+          ctaUrl: {
+            type: 'string',
+            description: 'URL for property details'
+          },
+          carpetArea: {
+            type: 'string',
+            description: 'Carpet area in sq.ft'
+          },
+          bathrooms: {
+            type: 'string',
+            description: 'Number of bathrooms'
+          }
+        }
+      },
+      Filters: {
+        type: 'object',
+        properties: {
+          bhk: {
+            type: 'string',
+            description: 'Exact BHK filter applied'
+          },
+          city: {
+            type: 'string',
+            enum: ['pune', 'mumbai', 'both'],
+            description: 'City filter applied'
+          },
+          maxPrice: {
+            type: 'number',
+            description: 'Maximum price filter in rupees'
+          },
+          status: {
+            type: 'string',
+            enum: ['READY_TO_MOVE', 'UNDER_CONSTRUCTION'],
+            description: 'Property status filter'
+          },
+          propertyType: {
+            type: 'string',
+            enum: ['RESIDENTIAL', 'COMMERCIAL'],
+            description: 'Property type filter'
+          },
+          isRelevant: {
+            type: 'boolean',
+            description: 'Whether query was relevant to property search'
+          }
+        }
+      }
+    }
+  }
+};
+
+// Serve Swagger UI
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
+  explorer: true,
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: "PropBot AI API Documentation",
+  swaggerOptions: {
+    persistAuthorization: true,
+    displayRequestDuration: true,
+    filter: true
+  }
+}));
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({ 
+    message: '🚀 PropBot AI Backend is running!',
+    description: 'Intelligent Property Search API for Pune and Mumbai',
+    version: '1.0.0',
+    documentation: `Visit http://localhost:${PORT}/api-docs for interactive API documentation`,
+    endpoints: {
+      root: '/',
+      health: '/health',
+      api_info: '/api',
+      chat: '/api/chat/message',
+      chat_test: '/api/chat/test',
+      swagger_ui: '/api-docs'
+    },
+    features: {
+      natural_language_processing: 'Understands queries like "2BHK in Pune under 80 Lakh"',
+      exact_filtering: 'Precise BHK, budget, and location matching',
+      property_details: 'Complete property information with amenities',
+      smart_summaries: 'AI-generated search result summaries'
+    },
+    examples: {
+      chat_request: {
+        method: 'POST',
+        url: '/api/chat/message',
+        body: {
+          message: '2BHK flats in Pune under 80 Lakh'
+        }
+      },
+      test_queries: [
+        '3BHK in Mumbai under 1.2 Cr',
+        'Ready to move 1BHK in Pune', 
+        'Properties under 1 Cr',
+        '2BHK apartments in Mumbai'
+      ]
+    }
+  });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('❌ Server Error:', err);
+  res.status(500).json({
+    success: false,
+    error: 'Internal server error',
+    message: 'Something went wrong! Please try again later.',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// 404 handler - This should be LAST
+app.use('*', (req, res) => {
+  console.log(`❌ 404 - Route not found: ${req.originalUrl}`);
+  res.status(404).json({
+    success: false,
+    error: 'Endpoint not found',
+    message: `Route ${req.originalUrl} does not exist`,
+    available_endpoints: {
+      root: '/',
+      health: '/health',
+      api_info: '/api',
+      chat: '/api/chat/message',
+      chat_test: '/api/chat/test',
+      docs: '/api-docs'
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`\n✨ ========================================`);
+  console.log(`   🚀 PropBot AI API Server Started`);
+  console.log(`   📍 Port: ${PORT}`);
+  console.log(`   🌐 Environment: Development`);
+  console.log(`✨ ========================================\n`);
+  
+  console.log(`📚 API Documentation:`);
+  console.log(`   🔗 http://localhost:${PORT}/api-docs\n`);
+  
+  console.log(`🔍 Test Endpoints:`);
+  console.log(`   ✅ Health Check: http://localhost:${PORT}/health`);
+  console.log(`   💬 Chat Test: http://localhost:${PORT}/api/chat/test`);
+  console.log(`   🏠 API Info: http://localhost:${PORT}/api\n`);
+  
+  console.log(`💡 Example Queries for Testing:`);
+  console.log(`   🏠 "2BHK in Pune under 80 Lakh"`);
+  console.log(`   🏢 "3BHK flats in Mumbai under 1.2 Cr"`);
+  console.log(`   ✅ "Ready to move 1BHK in Pune"`);
+  console.log(`   🏗️ "Under construction properties in Mumbai"`);
+  console.log(`   💰 "Properties under 1 Cr"\n`);
+  
+  console.log(`⚡ Usage:`);
+  console.log(`   Use Swagger UI for interactive testing`);
+  console.log(`   Or send POST requests to /api/chat/message\n`);
+  
+  console.log(`🔧 Features:`);
+  console.log(`   ✅ Exact BHK matching (no cross-BHK results)`);
+  console.log(`   ✅ Strict budget filtering`);
+  console.log(`   ✅ Accurate location detection`);
+  console.log(`   ✅ Smart status filtering`);
+  console.log(`   ✅ Complete property details\n`);
+});
+
+module.exports = app;

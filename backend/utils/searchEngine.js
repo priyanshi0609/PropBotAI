@@ -1,5 +1,7 @@
+const { csvParser } = require('./csvParser');
+
 class SearchEngine {
-  constructor(csvParser) {
+  constructor() {
     this.csvParser = csvParser;
   }
 
@@ -10,99 +12,226 @@ class SearchEngine {
     }
 
     const allData = this.csvParser.getJoinedData();
-    console.log('Total data available:', allData.length);
-    console.log('Applying filters:', filters);
+    console.log('📊 Total data available:', allData.length);
+    console.log('🎯 Applying EXACT filters:', filters);
     
     const results = allData.filter(property => {
-      // Filter by city - STRICT requirement
-      if (filters.city && filters.city !== 'both') {
-        if (!property.address || !property.address.fullAddress) {
-          return false;
-        }
-        const address = property.address.fullAddress.toLowerCase();
-        if (!address.includes(filters.city.toLowerCase())) {
-          return false;
-        }
-      } else if (!filters.city) {
-        // If no city specified, only show properties from Pune/Mumbai
-        if (!property.address || !property.address.fullAddress) {
-          return false;
-        }
-        const address = property.address.fullAddress.toLowerCase();
-        if (!address.includes('pune') && !address.includes('mumbai')) {
-          return false;
-        }
-      }
+      console.log(`\n🔍 Checking property: ${property.project.projectName}`);
 
-      // Filter by BHK - EXACT matching
-      if (filters.bhk) {
-        const hasMatchingBHK = property.configurations.some(config => {
-          const type = (config.type || '').toLowerCase();
-          const customBHK = (config.customBHK || '').toLowerCase();
-          const targetBHK = filters.bhk.toLowerCase();
-          
-          // Exact BHK matching patterns
-          const exactPatterns = [
-            `${targetBHK}bhk`,
-            `${targetBHK} bhk`,
-            `bhk ${targetBHK}`,
-            `${targetBHK} bedroom`,
-            `${targetBHK} bed`
-          ];
-
-          return exactPatterns.some(pattern => 
-            type.includes(pattern) || customBHK.includes(pattern)
-          ) || 
-          // Handle cases like "2BHK" in customBHK field
-          customBHK === `${targetBHK}bhk` ||
-          customBHK === `${targetBHK} bhk` ||
-          // Handle numeric matching in type field
-          type === `${targetBHK}bhk` ||
-          type === `${targetBHK} bhk`;
-        });
-        
-        if (!hasMatchingBHK) {
-          console.log(`No matching BHK found for ${filters.bhk}`);
-          return false;
-        }
-      }
-
-      // Filter by price
-      if (filters.maxPrice) {
-        const hasAffordableVariant = property.variants.some(variant => {
-          const price = parseFloat(variant.price) || 0;
-          return price > 0 && price <= filters.maxPrice;
-        });
-        if (!hasAffordableVariant) return false;
-      }
-
-      // Filter by status
-      if (filters.status && property.project.status !== filters.status) {
+      // STRICT City Filtering - ONLY Pune or Mumbai
+      if (!this.passesCityFilter(property, filters)) {
         return false;
       }
 
-      // Filter by property type
-      if (filters.propertyType && property.project.projectType !== filters.propertyType) {
+      // EXACT BHK Matching - CRITICAL
+      if (filters.bhk && !this.passesExactBHKFilter(property, filters.bhk)) {
         return false;
       }
 
+      // STRICT Budget Filtering
+      if (filters.maxPrice && !this.passesBudgetFilter(property, filters.maxPrice)) {
+        return false;
+      }
+
+      // Status Filtering
+      if (filters.status && !this.passesStatusFilter(property, filters.status)) {
+        return false;
+      }
+
+      // Property Type Filtering
+      if (filters.propertyType && !this.passesPropertyTypeFilter(property, filters.propertyType)) {
+        return false;
+      }
+
+      console.log(`✅ Property PASSED all filters: ${property.project.projectName}`);
       return true;
     });
 
-    console.log('Filtered results:', results.length);
+    console.log(`\n🎯 FINAL RESULTS: ${results.length} properties found`);
+    
+    // Log detailed results
+    this.logDetailedResults(results);
+
     return results;
+  }
+
+  // EXACT City Filtering
+  passesCityFilter(property, filters) {
+    if (!property.address || !property.address.fullAddress) {
+      console.log(`❌ No address data`);
+      return false;
+    }
+
+    const address = property.address.fullAddress.toLowerCase();
+    const hasPune = address.includes('pune');
+    const hasMumbai = address.includes('mumbai');
+
+    let cityMatch = false;
+
+    if (filters.city === 'pune') {
+      cityMatch = hasPune && !hasMumbai;
+    } else if (filters.city === 'mumbai') {
+      cityMatch = hasMumbai && !hasPune;
+    } else if (filters.city === 'both') {
+      cityMatch = hasPune || hasMumbai;
+    } else {
+      // No city filter - only show Pune/Mumbai properties
+      cityMatch = hasPune || hasMumbai;
+    }
+
+    if (!cityMatch) {
+      console.log(`❌ City filter failed: ${property.address.fullAddress}`);
+    } else {
+      console.log(`✅ City filter passed: ${property.address.fullAddress}`);
+    }
+
+    return cityMatch;
+  }
+
+  // EXACT BHK Matching - IMPROVED
+  passesExactBHKFilter(property, targetBHK) {
+    const hasExactBHK = property.configurations.some(config => {
+      const type = (config.type || '').toLowerCase().replace(/\s+/g, '');
+      const customBHK = (config.customBHK || '').toLowerCase().replace(/\s+/g, '');
+      
+      console.log(`   Checking BHK: Type="${type}", Custom="${customBHK}", Target="${targetBHK}bhk"`);
+      
+      // EXACT matching patterns for the specific BHK
+      const exactMatches = this.generateExactBHKPatterns(targetBHK);
+      
+      // Check for exact match in both type and customBHK
+      const typeMatch = exactMatches.some(pattern => 
+        type === pattern.replace(/\s+/g, '')
+      );
+      
+      const customMatch = exactMatches.some(pattern => 
+        customBHK === pattern.replace(/\s+/g, '')
+      );
+
+      // Additional check for semantic matches in customBHK
+      const semanticMatch = this.checkSemanticBHKMatch(customBHK, targetBHK);
+
+      return typeMatch || customMatch || semanticMatch;
+    });
+    
+    if (!hasExactBHK) {
+      console.log(`❌ No EXACT BHK match found for ${targetBHK}BHK`);
+    } else {
+      console.log(`✅ EXACT BHK match found for ${targetBHK}BHK`);
+    }
+    
+    return hasExactBHK;
+  }
+
+  // Generate exact BHK patterns for a specific number
+  generateExactBHKPatterns(bhkNumber) {
+    return [
+      `${bhkNumber}bhk`,
+      `${bhkNumber} bhk`,
+      `bhk${bhkNumber}`,
+      `${bhkNumber}bedroom`,
+      `${bhkNumber} bedroom`,
+      `${bhkNumber}bed`,
+      `${bhkNumber} bed`,
+      `${bhkNumber}room`,
+      `${bhkNumber} room`,
+      `${bhkNumber}rk`,
+      `${bhkNumber} rk`,
+      `${bhkNumber}b/h/k`,
+      `${bhkNumber} b/h/k`
+    ];
+  }
+
+  // Semantic BHK matching for edge cases
+  checkSemanticBHKMatch(customBHK, targetBHK) {
+    const semanticPatterns = {
+      '1': [/1bhk/i, /1 bhk/i, /onebhk/i, /single room/i, /1rk/i, /1 rk/i],
+      '2': [/2bhk/i, /2 bhk/i, /twobhk/i, /double room/i, /2rk/i, /2 rk/i],
+      '3': [/3bhk/i, /3 bhk/i, /threebhk/i, /triple room/i, /3rk/i, /3 rk/i]
+    };
+
+    const patterns = semanticPatterns[targetBHK] || [];
+    return patterns.some(pattern => pattern.test(customBHK));
+  }
+
+  // Budget Filtering
+  passesBudgetFilter(property, maxPrice) {
+    const hasAffordableVariant = property.variants.some(variant => {
+      const price = parseFloat(variant.price) || 0;
+      const isAffordable = price > 0 && price <= maxPrice;
+      
+      if (isAffordable) {
+        console.log(`✅ Price match: ₹${price} <= ₹${maxPrice}`);
+      } else {
+        console.log(`❌ Price exceeds: ₹${price} > ₹${maxPrice}`);
+      }
+      
+      return isAffordable;
+    });
+    
+    if (!hasAffordableVariant) {
+      console.log(`❌ No affordable variants found under ₹${maxPrice}`);
+    }
+    
+    return hasAffordableVariant;
+  }
+
+  // Status Filtering
+  passesStatusFilter(property, status) {
+    const statusMatch = property.project.status === status;
+    
+    if (!statusMatch) {
+      console.log(`❌ Status filter failed: ${property.project.status} != ${status}`);
+    } else {
+      console.log(`✅ Status filter passed: ${property.project.status}`);
+    }
+    
+    return statusMatch;
+  }
+
+  // Property Type Filtering
+  passesPropertyTypeFilter(property, propertyType) {
+    const typeMatch = property.project.projectType === propertyType;
+    
+    if (!typeMatch) {
+      console.log(`❌ Property type filter failed: ${property.project.projectType} != ${propertyType}`);
+    } else {
+      console.log(`✅ Property type filter passed: ${property.project.projectType}`);
+    }
+    
+    return typeMatch;
+  }
+
+  // Log detailed results
+  logDetailedResults(results) {
+    if (results.length > 0) {
+      console.log('\n📋 MATCHING PROPERTIES:');
+      results.forEach((result, index) => {
+        const config = result.configurations[0];
+        const variant = result.variants[0];
+        const price = variant?.price ? `₹${(parseFloat(variant.price) / 100000).toFixed(0)}L` : 'N/A';
+        console.log(`  ${index + 1}. ${result.project.projectName} | ${config.type} | ${price} | ${result.project.status}`);
+      });
+    } else {
+      console.log('\n❌ NO PROPERTIES FOUND matching the exact criteria');
+    }
   }
 
   generateSummary(results, filters) {
     // Handle irrelevant queries
     if (filters.isRelevant === false) {
+      if (filters.unsupportedCity) {
+        return "I specialize only in properties in Pune and Mumbai. I cannot help with properties in other cities. Please search for properties in Pune or Mumbai.";
+      }
       return "I specialize in property search for Pune and Mumbai. Try asking about flats, BHK requirements, or budget constraints!";
     }
 
     if (results.length === 0) {
-      const city = filters.city && filters.city !== 'both' ? `in ${filters.city.charAt(0).toUpperCase() + filters.city.slice(1)}` : 'in Pune or Mumbai';
+      const city = filters.city && filters.city !== 'both' ? 
+        `in ${filters.city.charAt(0).toUpperCase() + filters.city.slice(1)}` : 'in Pune or Mumbai';
       const bhk = filters.bhk ? `${filters.bhk} BHK ` : '';
-      const price = filters.maxPrice ? `under ₹${(filters.maxPrice / 10000000).toFixed(1)} Cr` : '';
+      const price = filters.maxPrice ? 
+        `under ₹${filters.maxPrice >= 10000000 ? (filters.maxPrice / 10000000).toFixed(1) + ' Cr' : (filters.maxPrice / 100000).toFixed(0) + ' Lakh'}` : '';
       const status = filters.status ? `that are ${filters.status.replace(/_/g, ' ').toLowerCase()}` : '';
       
       let message = `No ${bhk}properties found ${city} ${price} ${status}.`;
@@ -119,9 +248,11 @@ class SearchEngine {
       return message;
     }
 
-    const city = filters.city && filters.city !== 'both' ? `in ${filters.city.charAt(0).toUpperCase() + filters.city.slice(1)}` : 'in Pune and Mumbai';
+    const city = filters.city && filters.city !== 'both' ? 
+      `in ${filters.city.charAt(0).toUpperCase() + filters.city.slice(1)}` : 'in Pune and Mumbai';
     const bhk = filters.bhk ? `${filters.bhk} BHK ` : '';
-    const price = filters.maxPrice ? `under ₹${(filters.maxPrice / 10000000).toFixed(1)} Cr` : 'across various budgets';
+    const price = filters.maxPrice ? 
+      `under ₹${filters.maxPrice >= 10000000 ? (filters.maxPrice / 10000000).toFixed(1) + ' Cr' : (filters.maxPrice / 100000).toFixed(0) + ' Lakh'}` : 'across various budgets';
     const status = filters.status ? `that are ${filters.status.replace(/_/g, ' ').toLowerCase()}` : '';
     
     const readyCount = results.filter(r => r.project.status === 'READY_TO_MOVE').length;
@@ -157,19 +288,19 @@ class SearchEngine {
       const variant = property.variants[0];
       const config = property.configurations[0];
       
-      const price = variant?.price ? 
-        `₹${(parseFloat(variant.price) / 10000000).toFixed(2)} Cr` : 'Price on request';
-      
-      // Extract amenities from variant data
-      const amenities = [];
-      if (variant?.lift === 'true') amenities.push('Lift');
-      if (variant?.balcony && parseInt(variant.balcony) > 0) amenities.push('Balcony');
-      if (variant?.furnishedType && variant.furnishedType !== 'UNFURNISHED') {
-        amenities.push(variant.furnishedType.toLowerCase());
+      // Format price properly
+      let priceFormatted = 'Price on request';
+      if (variant?.price) {
+        const priceNum = parseFloat(variant.price);
+        if (priceNum >= 10000000) {
+          priceFormatted = `₹${(priceNum / 10000000).toFixed(2)} Cr`;
+        } else {
+          priceFormatted = `₹${(priceNum / 100000).toFixed(0)} L`;
+        }
       }
-      if (amenities.length === 0) {
-        amenities.push('Parking', 'Security');
-      }
+
+      // Extract amenities
+      const amenities = this.extractAmenities(variant);
 
       return {
         id: property.project.id,
@@ -177,15 +308,30 @@ class SearchEngine {
         city: property.address ? this.extractCity(property.address.fullAddress) : 'Unknown',
         locality: property.address?.landmark || this.extractLocality(property.address?.fullAddress) || 'Various locations',
         bhk: config?.type || config?.customBHK || 'N/A',
-        price: price,
+        price: priceFormatted,
         projectName: property.project.projectName,
-        status: property.project.status?.replace(/_/g, ' ') || 'Unknown',
+        status: property.project.status === 'READY_TO_MOVE' ? 'Ready' : 
+                property.project.status === 'UNDER_CONSTRUCTION' ? 'Under Construction' : 'Unknown',
         amenities: amenities.slice(0, 3),
-        slug: property.project.slug || property.project.id,
+        ctaUrl: `/project/${property.project.slug || property.project.id}`,
         carpetArea: variant?.carpetArea ? `${variant.carpetArea} sq.ft` : 'N/A',
         bathrooms: variant?.bathrooms || 'N/A'
       };
     });
+  }
+
+  extractAmenities(variant) {
+    const amenities = [];
+    if (variant?.lift === 'true') amenities.push('Lift');
+    if (variant?.balcony && parseInt(variant.balcony) > 0) amenities.push('Balcony');
+    if (variant?.furnishedType && variant.furnishedType !== 'UNFURNISHED') {
+      amenities.push(variant.furnishedType.charAt(0) + variant.furnishedType.slice(1).toLowerCase());
+    }
+    if (variant?.parkingType) amenities.push('Parking');
+    if (amenities.length === 0) {
+      amenities.push('Parking', 'Security');
+    }
+    return amenities;
   }
 
   extractCity(fullAddress) {
@@ -193,7 +339,7 @@ class SearchEngine {
     const address = fullAddress.toLowerCase();
     if (address.includes('pune')) return 'Pune';
     if (address.includes('mumbai')) return 'Mumbai';
-    return fullAddress.split(',').pop()?.trim() || 'Unknown';
+    return 'Unknown';
   }
 
   extractLocality(fullAddress) {
@@ -203,6 +349,6 @@ class SearchEngine {
   }
 }
 
-const searchEngine = new SearchEngine(require('./csvParser').csvParser);
+const searchEngine = new SearchEngine();
 
 module.exports = { SearchEngine, searchEngine };
