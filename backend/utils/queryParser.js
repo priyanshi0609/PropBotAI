@@ -35,7 +35,7 @@ class QueryParser {
 
     filters.isRelevant = true;
 
-    // EXACT BHK Matching - FIXED LOGIC
+    // EXACT BHK Matching - ULTRA ACCURATE LOGIC
     filters.bhk = this.extractExactBHK(cleanQuery);
 
     // City extraction
@@ -55,93 +55,174 @@ class QueryParser {
     return filters;
   }
 
-  // EXACT BHK extraction - CORRECTED VERSION
+  // ULTRA ACCURATE BHK extraction - FIXED ALL EDGE CASES
   extractExactBHK(query) {
     console.log('🛏️ Extracting BHK from:', query);
     
-    // First, try to find exact BHK patterns
-    const bhkPatterns = [
-      // Pattern: "2 bhk", "3 bhk flat", "1 bhk apartment"
+    // Remove common false positives and normalize the query
+    const normalizedQuery = query
+      .replace(/[.,]/g, ' ') // Replace punctuation with spaces
+      .replace(/\s+/g, ' ') // Normalize multiple spaces
+      .trim();
+
+    console.log('📝 Normalized query:', normalizedQuery);
+
+    // STRICT BHK patterns - only match when BHK is explicitly mentioned
+    const strictBhkPatterns = [
+      // Pattern: "2 bhk" (with word boundaries)
       /\b(\d)\s*bhk\b/i,
       
-      // Pattern: "2bhk", "3bhk flat", "1bhk apartment"  
+      // Pattern: "2bhk" (no space)
       /\b(\d)bhk\b/i,
       
-      // Pattern: "2 bedroom", "3 bedroom flat"
+      // Pattern: "2 bedroom" 
       /\b(\d)\s*bedroom\b/i,
       
-      // Pattern: "2 bed", "3 bed flat"
+      // Pattern: "2 bed" 
       /\b(\d)\s*bed\b/i,
       
-      // Pattern: "2 b h k", "3 b.h.k"
-      /\b(\d)\s*b\s*\.?\s*h\s*\.?\s*k\b/i,
+      // Pattern: "2 b h k"
+      /\b(\d)\s*b\s*h\s*k\b/i,
       
-      // Pattern: "2 b r", "3 b/r"
-      /\b(\d)\s*b\s*\.?\s*r\b/i,
+      // Pattern: "2 b r"
+      /\b(\d)\s*b\s*r\b/i,
       
-      // Pattern: "2 rk", "3 rk flat"
+      // Pattern: "2 rk"
       /\b(\d)\s*rk\b/i,
+
+      // Pattern: "2 b.h.k" or "2 b.h.k."
+      /\b(\d)\s*b\s*\.\s*h\s*\.\s*k\b/i,
+
+      // Pattern: "2 b/h/k" or "2 b/r"
+      /\b(\d)\s*b\s*\/\s*[hr]\s*\/?\s*k?\b/i,
+
+      // Pattern: "2 bhk flat" - ensure it's not part of another word
+      /\b(\d)\s*bhk\s+(?:flat|apartment|house|property)\b/i,
+
+      // Pattern: "flat with 2 bhk"
+      /\b(?:flat|apartment|house|property)\s+(?:with|of)\s+(\d)\s*bhk\b/i,
     ];
 
-    for (const pattern of bhkPatterns) {
-      const match = query.match(pattern);
+    for (const pattern of strictBhkPatterns) {
+      const match = normalizedQuery.match(pattern);
       if (match) {
         const bhk = match[1];
         if (['1', '2', '3'].includes(bhk)) {
-          console.log(`✅ Found EXACT BHK with pattern ${pattern}: ${bhk}BHK`);
+          console.log(`✅ Found STRICT BHK with pattern: ${bhk}BHK`);
           return bhk;
         }
       }
     }
 
-    // Handle word numbers: "one bhk", "two bhk", "three bhk"
+    // Handle word numbers with strict context
     const wordPatterns = [
-      /\b(one)\s*bhk\b/i,
-      /\b(two)\s*bhk\b/i, 
-      /\b(three)\s*bhk\b/i,
-      /\b(one)\s*bedroom\b/i,
-      /\b(two)\s*bedroom\b/i,
-      /\b(three)\s*bedroom\b/i
+      { pattern: /\b(one)\s*bhk\b/i, number: '1' },
+      { pattern: /\b(two)\s*bhk\b/i, number: '2' },
+      { pattern: /\b(three)\s*bhk\b/i, number: '3' },
+      { pattern: /\b(one)\s*bedroom\b/i, number: '1' },
+      { pattern: /\b(two)\s*bedroom\b/i, number: '2' },
+      { pattern: /\b(three)\s*bedroom\b/i, number: '3' },
+      { pattern: /\b(1)\s*bhk\b/i, number: '1' },
+      { pattern: /\b(2)\s*bhk\b/i, number: '2' },
+      { pattern: /\b(3)\s*bhk\b/i, number: '3' }
     ];
 
-    for (const pattern of wordPatterns) {
-      const match = query.match(pattern);
+    for (const { pattern, number } of wordPatterns) {
+      const match = normalizedQuery.match(pattern);
       if (match) {
-        const numberMap = { 'one': '1', 'two': '2', 'three': '3' };
-        const bhk = numberMap[match[1].toLowerCase()];
-        console.log(`✅ Found WORD BHK: ${bhk}BHK`);
-        return bhk;
+        console.log(`✅ Found WORD BHK: ${number}BHK`);
+        return number;
       }
     }
 
-    // Handle positional patterns: "bhk 2", "bedroom 3"
+    // Handle positional patterns with context
     const positionalPatterns = [
-      /bhk\s*(\d)\b/i,
-      /bedroom\s*(\d)\b/i,
-      /bed\s*(\d)\b/i,
-      /rk\s*(\d)\b/i
+      /bhk\s+(\d)\b/i,
+      /bedroom\s+(\d)\b/i,
+      /bed\s+(\d)\b/i,
+      /rk\s+(\d)\b/i
     ];
 
     for (const pattern of positionalPatterns) {
-      const match = query.match(pattern);
+      const match = normalizedQuery.match(pattern);
       if (match && ['1', '2', '3'].includes(match[1])) {
-        console.log(`✅ Found POSITIONAL BHK: ${match[1]}BHK`);
-        return match[1];
+        // Verify this is in property context
+        const context = normalizedQuery.substring(0, match.index);
+        if (this.isPropertyContext(context)) {
+          console.log(`✅ Found POSITIONAL BHK with context: ${match[1]}BHK`);
+          return match[1];
+        }
       }
     }
 
-    // Handle standalone numbers in property context
-    if (this.isPropertyQuery(query)) {
-      const standaloneNumbers = query.match(/\b(1|2|3)\b/);
-      if (standaloneNumbers) {
-        const bhk = standaloneNumbers[1];
-        console.log(`✅ Found STANDALONE BHK in property context: ${bhk}BHK`);
-        return bhk;
+    // Handle "X BHK" at the beginning of query
+    const startPattern = /^(\d)\s*bhk/i;
+    const startMatch = normalizedQuery.match(startPattern);
+    if (startMatch && ['1', '2', '3'].includes(startMatch[1])) {
+      console.log(`✅ Found STARTING BHK: ${startMatch[1]}BHK`);
+      return startMatch[1];
+    }
+
+    // Handle queries like "I want 2 bhk" with number before BHK context
+    const wantPattern = /(?:want|need|looking for|searching for|find)\s+(\d)\s*(?:bhk|bedroom|bed)/i;
+    const wantMatch = normalizedQuery.match(wantPattern);
+    if (wantMatch && ['1', '2', '3'].includes(wantMatch[1])) {
+      console.log(`✅ Found INTENT BHK: ${wantMatch[1]}BHK`);
+      return wantMatch[1];
+    }
+
+    // Handle range queries like "2-3 bhk" - take the first number
+    const rangePattern = /(\d)\s*[-–]\s*(\d)\s*bhk/i;
+    const rangeMatch = normalizedQuery.match(rangePattern);
+    if (rangeMatch && ['1', '2', '3'].includes(rangeMatch[1])) {
+      console.log(`✅ Found RANGE BHK (taking first): ${rangeMatch[1]}BHK`);
+      return rangeMatch[1];
+    }
+
+    // FINAL FALLBACK: Only extract standalone numbers in VERY clear property context
+    if (this.isVeryClearPropertyQuery(normalizedQuery)) {
+      const standalonePatterns = [
+        /\b(\d)\s+(?:bhk|bedroom|bed|room)\b/i,
+        /\b(?:bhk|bedroom|bed|room)\s+(\d)\b/i,
+        /\b(\d)(?:\s*)?(?:bhk|bedroom|bed)\b/i
+      ];
+
+      for (const pattern of standalonePatterns) {
+        const match = normalizedQuery.match(pattern);
+        if (match && ['1', '2', '3'].includes(match[1])) {
+          console.log(`✅ Found FALLBACK BHK: ${match[1]}BHK`);
+          return match[1];
+        }
       }
     }
 
-    console.log('❌ No BHK found');
+    console.log('❌ No BHK found - query too ambiguous');
     return null;
+  }
+
+  // Strict property context check
+  isPropertyContext(text) {
+    const propertyIndicators = [
+      'flat', 'apartment', 'house', 'property', 'home', 'residence',
+      'pune', 'mumbai', 'buy', 'rent', 'looking', 'searching', 'want',
+      'need', 'find', 'show', 'list'
+    ];
+    return propertyIndicators.some(indicator => 
+      text.includes(indicator)
+    );
+  }
+
+  // Very strict property query detection for fallback
+  isVeryClearPropertyQuery(query) {
+    const clearPropertyPatterns = [
+      /(?:flat|apartment|house|property).*(?:\d\s*bhk|\d\s*bedroom)/i,
+      /(?:\d\s*bhk|\d\s*bedroom).*(?:flat|apartment|house|property)/i,
+      /(?:looking|searching|want|need).*(?:\d\s*bhk|\d\s*bedroom)/i,
+      /(?:pune|mumbai).*(?:\d\s*bhk|\d\s*bedroom)/i,
+      /(?:\d\s*bhk|\d\s*bedroom).*(?:pune|mumbai)/i
+    ];
+
+    return clearPropertyPatterns.some(pattern => pattern.test(query));
   }
 
   // Helper to check if this is clearly a property query
@@ -149,7 +230,7 @@ class QueryParser {
     const propertyContext = [
       'flat', 'apartment', 'house', 'property', 'home',
       'pune', 'mumbai', 'lakh', 'cr', 'crore', 'budget',
-      'ready', 'construction', 'possession'
+      'ready', 'construction', 'possession', 'buy', 'rent'
     ];
     
     return propertyContext.some(context => query.includes(context));
