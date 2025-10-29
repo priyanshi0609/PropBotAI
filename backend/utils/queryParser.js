@@ -1,314 +1,193 @@
 class QueryParser {
+  constructor() {
+    // Supported BHK configurations from your CSV
+    this.supportedBHKs = ['1', '2', '3', '4', '5'];
+    this.supportedBHKTypes = ['1BHK', '2BHK', '3BHK', '4BHK', '5BHK', '4.5BHK', '1RK'];
+    
+    // Extended BHK mappings for different formats
+    this.bhkMappings = {
+      '1': ['1', '1bhk', 'one', 'single', '1 bhk', '1 bedroom'],
+      '2': ['2', '2bhk', 'two', 'double', '2 bhk', '2 bedroom'],
+      '3': ['3', '3bhk', 'three', 'triple', '3 bhk', '3 bedroom'],
+      '4': ['4', '4bhk', 'four', '4 bhk', '4 bedroom'],
+      '5': ['5', '5bhk', 'five', '5 bhk', '5 bedroom'],
+      '4.5': ['4.5', '4.5bhk', 'four point five', '4.5 bhk'],
+      '1RK': ['1rk', '1 rk', 'rk', 'room kitchen']
+    };
+    
+    this.supportedCities = ['pune', 'mumbai'];
+    
+    this.localityMappings = {
+      'poon': 'pune',
+      'poona': 'pune',
+      'bombay': 'mumbai',
+      'it park': 'hinjewadi',
+      'magarpatta city': 'magarpatta',
+      'kalyani nagr': 'kalyani nagar',
+      'koregaon pk': 'koregaon park'
+    };
+  }
+
   parse(query) {
     const cleanQuery = query.toLowerCase().trim();
     const filters = {};
     
     console.log('🔍 Parsing query:', cleanQuery);
 
-    // Enhanced property intent detection with better coverage
+    // Apply fuzzy matching for typos
+    const normalizedQuery = this.applyFuzzyMatching(cleanQuery);
+
+    // Enhanced property intent detection
+    const hasPropertyIntent = this.hasPropertyIntent(normalizedQuery);
+    const hasCityIntent = this.extractCityIntent(normalizedQuery);
+    const hasBudgetIntent = this.extractBudgetIntent(normalizedQuery);
+    const hasBHKIntent = this.hasBHKIntent(normalizedQuery);
+
+    // Edge case: If query mentions specific cities outside Pune/Mumbai
+    if (this.hasUnsupportedCities(normalizedQuery)) {
+      filters.isRelevant = false;
+      filters.unsupportedCity = true;
+      filters.detectedCity = this.extractUnsupportedCity(normalizedQuery);
+      return filters;
+    }
+
+    // Check for clearly irrelevant queries
+    if (this.isClearlyIrrelevantQuery(normalizedQuery)) {
+      filters.isRelevant = false;
+      filters.queryType = 'irrelevant';
+      return filters;
+    }
+
+    // Check for BHK numbers that don't exist in database
+    const extractedBHK = this.extractExactBHK(normalizedQuery);
+    if (extractedBHK && !this.isSupportedBHK(extractedBHK)) {
+      filters.isRelevant = false;
+      filters.unsupportedBHK = extractedBHK;
+      filters.availableBHKs = this.getAvailableBHKsForDisplay();
+      return filters;
+    }
+
+    // Check for ambiguous BHK ranges
+    const bhkRange = this.extractBHKRange(normalizedQuery);
+    if (bhkRange && bhkRange.isRange) {
+      // Validate all BHKs in range are supported
+      const unsupportedInRange = bhkRange.values.filter(bhk => !this.isSupportedBHK(bhk));
+      if (unsupportedInRange.length > 0) {
+        filters.isRelevant = false;
+        filters.unsupportedBHK = unsupportedInRange[0];
+        filters.availableBHKs = this.getAvailableBHKsForDisplay();
+        return filters;
+      }
+      filters.bhkRange = bhkRange;
+      filters.hasMultipleBHK = true;
+    }
+
+    // Check for ambiguous budget (missing units)
+    const ambiguousBudget = this.extractAmbiguousBudget(normalizedQuery);
+    if (ambiguousBudget) {
+      filters.ambiguousBudget = ambiguousBudget;
+      filters.needsBudgetClarification = true;
+    }
+
+    // Check if query is too vague
+    if (this.isTooVagueQuery(normalizedQuery, hasPropertyIntent, hasBHKIntent, hasBudgetIntent)) {
+      filters.isRelevant = false;
+      filters.vagueQuery = true;
+      filters.missingFilters = this.identifyMissingFilters(normalizedQuery, hasPropertyIntent, hasBHKIntent, hasBudgetIntent);
+      return filters;
+    }
+
+    // Handle multiple queries in one message
+    if (this.hasMultipleQueries(normalizedQuery)) {
+      filters.isRelevant = false;
+      filters.multipleQueries = true;
+      return filters;
+    }
+
+    filters.isRelevant = true;
+
+    // EXACT BHK Matching - Handle single BHK and ranges
+    if (bhkRange && bhkRange.isRange) {
+      filters.bhk = bhkRange.values[0];
+      filters.bhkRange = bhkRange;
+    } else {
+      filters.bhk = extractedBHK;
+    }
+
+    // City extraction with multiple city support
+    filters.city = this.extractExactCity(normalizedQuery);
+
+    // Budget extraction - Handle ambiguous budgets
+    if (!filters.needsBudgetClarification) {
+      const budget = this.extractExactBudget(normalizedQuery);
+      if (budget) filters.maxPrice = budget;
+    }
+
+    // Status extraction
+    filters.status = this.extractExactStatus(normalizedQuery);
+
+    // Property type extraction
+    filters.propertyType = this.extractPropertyType(normalizedQuery);
+
+    // Extract localities for better matching
+    filters.localities = this.extractLocalities(normalizedQuery);
+
+    // Handle OR conditions in query
+    filters.orConditions = this.extractOrConditions(normalizedQuery);
+
+    console.log('🎯 Final filters:', filters);
+    return filters;
+  }
+
+  // Apply fuzzy matching for typos
+  applyFuzzyMatching(query) {
+    let normalized = query;
+    
+    Object.keys(this.localityMappings).forEach(typo => {
+      const regex = new RegExp(`\\b${typo}\\b`, 'gi');
+      normalized = normalized.replace(regex, this.localityMappings[typo]);
+    });
+
+    normalized = normalized
+      .replace(/\b(bhk|bh|bk|b h k)\b/gi, 'bhk')
+      .replace(/\b(bedroom|bedrm|bed room)\b/gi, 'bedroom')
+      .replace(/\b(crore|cr|cror)\b/gi, 'cr')
+      .replace(/\b(lakh|lac|lacks)\b/gi, 'lakh');
+
+    if (normalized !== query) {
+      console.log('🔧 Applied fuzzy matching:', query, '→', normalized);
+    }
+
+    return normalized;
+  }
+
+  // Check if BHK is supported in database
+  isSupportedBHK(bhk) {
+    return this.supportedBHKs.includes(bhk) || 
+           this.supportedBHKTypes.includes(bhk.toUpperCase()) ||
+           bhk === '4.5' || bhk === '1rk';
+  }
+
+  // Get available BHKs for display in error messages
+  getAvailableBHKsForDisplay() {
+    return ['1BHK', '2BHK', '3BHK', '4BHK', '5BHK', '4.5BHK', '1RK'];
+  }
+
+  // Enhanced property intent detection
+  hasPropertyIntent(query) {
     const propertyKeywords = [
       'bhk', 'flat', 'apartment', 'house', 'property', 'properties',
       'home', 'residential', 'commercial', 'buy', 'purchase', 'find',
       'search', 'looking', 'need', 'want', 'show', 'list', 'room',
       'residence', 'unit', 'accommodation', 'living space', 'plot',
       'villa', 'builder', 'construction', 'possession', 'sale',
-      'rent', 'lease', 'investment', 'real estate', 'broker', 'agent'
+      'rent', 'lease', 'investment', 'real estate'
     ];
 
-    const hasPropertyIntent = propertyKeywords.some(keyword => 
-      cleanQuery.includes(keyword)
-    ) || this.hasSemanticPropertyIntent(cleanQuery);
-
-    const hasCityIntent = this.extractCityIntent(cleanQuery);
-    const hasBudgetIntent = this.extractBudgetIntent(cleanQuery);
-
-    // Edge case: If query mentions specific cities outside Pune/Mumbai
-    if (this.hasUnsupportedCities(cleanQuery)) {
-      filters.isRelevant = false;
-      filters.unsupportedCity = true;
-      return filters;
-    }
-
-    // Enhanced irrelevant query detection
-    if (!hasPropertyIntent && !hasCityIntent && !hasBudgetIntent) {
-      // Check for common non-property queries
-      if (this.isClearlyNonPropertyQuery(cleanQuery)) {
-        filters.isRelevant = false;
-        filters.queryType = 'non-property';
-        return filters;
-      }
-      
-      // Check for greetings and casual conversation
-      if (this.isCasualGreeting(cleanQuery)) {
-        filters.isRelevant = false;
-        filters.queryType = 'greeting';
-        return filters;
-      }
-      
-      // Check for technical/other questions
-      if (this.isTechnicalQuery(cleanQuery)) {
-        filters.isRelevant = false;
-        filters.queryType = 'technical';
-        return filters;
-      }
-    }
-
-    filters.isRelevant = true;
-
-    // EXACT BHK Matching - ULTRA ACCURATE LOGIC
-    filters.bhk = this.extractExactBHK(cleanQuery);
-
-    // City extraction
-    filters.city = this.extractExactCity(cleanQuery);
-
-    // Budget extraction
-    const budget = this.extractExactBudget(cleanQuery);
-    if (budget) filters.maxPrice = budget;
-
-    // Status extraction
-    filters.status = this.extractExactStatus(cleanQuery);
-
-    // Property type extraction
-    filters.propertyType = this.extractPropertyType(cleanQuery);
-
-    console.log('🎯 Final filters:', filters);
-    return filters;
+    return propertyKeywords.some(keyword => query.includes(keyword)) ||
+           this.hasSemanticPropertyIntent(query);
   }
 
-  // Enhanced irrelevant query detection
-  isClearlyNonPropertyQuery(query) {
-    const nonPropertyPatterns = [
-      /(weather|temperature|forecast)/i,
-      /(news|headlines|update)/i,
-      /(joke|funny|humor)/i,
-      /(time|date|day)/i,
-      /(calculate|math|addition)/i,
-      /(movie|film|entertainment)/i,
-      /(sport|game|player)/i,
-      /(music|song|artist)/i,
-      /(food|restaurant|recipe)/i,
-      /(travel|tourist|hotel)/i,
-      /(health|doctor|medical)/i,
-      /(education|school|college)/i,
-      /(politics|government|election)/i,
-      /(technology|computer|software)/i,
-      /(who is|what is|when is)/i,
-      /(how to|why should|where can)/i
-    ];
-    
-    return nonPropertyPatterns.some(pattern => pattern.test(query));
-  }
-
-  // Detect casual greetings and conversation
-  isCasualGreeting(query) {
-    const greetingPatterns = [
-      /^(hi|hello|hey|greetings|good morning|good afternoon|good evening)/i,
-      /^(how are you|how do you do|what's up|sup)/i,
-      /^(thank you|thanks|appreciate)/i,
-      /^(bye|goodbye|see you|farewell)/i,
-      /^(yes|no|maybe|ok|okay)/i,
-      /^(your name|who are you|what are you)/i
-    ];
-    
-    return greetingPatterns.some(pattern => pattern.test(query));
-  }
-
-  // Detect technical or other non-property questions
-  isTechnicalQuery(query) {
-    const technicalPatterns = [
-      /(how.*work|how.*built|how.*made)/i,
-      /(what.*language|what.*technology)/i,
-      /(api|endpoint|server|database)/i,
-      /(code|programming|developer)/i,
-      /(bug|error|issue|problem)/i,
-      /(feature|update|upgrade)/i
-    ];
-    
-    return technicalPatterns.some(pattern => pattern.test(query));
-  }
-
-  // ULTRA ACCURATE BHK extraction - FIXED ALL EDGE CASES
-  extractExactBHK(query) {
-    console.log('🛏️ Extracting BHK from:', query);
-    
-    // Remove common false positives and normalize the query
-    const normalizedQuery = query
-      .replace(/[.,]/g, ' ') // Replace punctuation with spaces
-      .replace(/\s+/g, ' ') // Normalize multiple spaces
-      .trim();
-
-    console.log('📝 Normalized query:', normalizedQuery);
-
-    // STRICT BHK patterns - only match when BHK is explicitly mentioned
-    const strictBhkPatterns = [
-      // Pattern: "2 bhk" (with word boundaries)
-      /\b(\d)\s*bhk\b/i,
-      
-      // Pattern: "2bhk" (no space)
-      /\b(\d)bhk\b/i,
-      
-      // Pattern: "2 bedroom" 
-      /\b(\d)\s*bedroom\b/i,
-      
-      // Pattern: "2 bed" 
-      /\b(\d)\s*bed\b/i,
-      
-      // Pattern: "2 b h k"
-      /\b(\d)\s*b\s*h\s*k\b/i,
-      
-      // Pattern: "2 b r"
-      /\b(\d)\s*b\s*r\b/i,
-      
-      // Pattern: "2 rk"
-      /\b(\d)\s*rk\b/i,
-
-      // Pattern: "2 b.h.k" or "2 b.h.k."
-      /\b(\d)\s*b\s*\.\s*h\s*\.\s*k\b/i,
-
-      // Pattern: "2 b/h/k" or "2 b/r"
-      /\b(\d)\s*b\s*\/\s*[hr]\s*\/?\s*k?\b/i,
-
-      // Pattern: "2 bhk flat" - ensure it's not part of another word
-      /\b(\d)\s*bhk\s+(?:flat|apartment|house|property)\b/i,
-
-      // Pattern: "flat with 2 bhk"
-      /\b(?:flat|apartment|house|property)\s+(?:with|of)\s+(\d)\s*bhk\b/i,
-    ];
-
-    for (const pattern of strictBhkPatterns) {
-      const match = normalizedQuery.match(pattern);
-      if (match) {
-        const bhk = match[1];
-        if (['1', '2', '3'].includes(bhk)) {
-          console.log(`✅ Found STRICT BHK with pattern: ${bhk}BHK`);
-          return bhk;
-        }
-      }
-    }
-
-    // Handle word numbers with strict context
-    const wordPatterns = [
-      { pattern: /\b(one)\s*bhk\b/i, number: '1' },
-      { pattern: /\b(two)\s*bhk\b/i, number: '2' },
-      { pattern: /\b(three)\s*bhk\b/i, number: '3' },
-      { pattern: /\b(one)\s*bedroom\b/i, number: '1' },
-      { pattern: /\b(two)\s*bedroom\b/i, number: '2' },
-      { pattern: /\b(three)\s*bedroom\b/i, number: '3' },
-      { pattern: /\b(1)\s*bhk\b/i, number: '1' },
-      { pattern: /\b(2)\s*bhk\b/i, number: '2' },
-      { pattern: /\b(3)\s*bhk\b/i, number: '3' }
-    ];
-
-    for (const { pattern, number } of wordPatterns) {
-      const match = normalizedQuery.match(pattern);
-      if (match) {
-        console.log(`✅ Found WORD BHK: ${number}BHK`);
-        return number;
-      }
-    }
-
-    // Handle positional patterns with context
-    const positionalPatterns = [
-      /bhk\s+(\d)\b/i,
-      /bedroom\s+(\d)\b/i,
-      /bed\s+(\d)\b/i,
-      /rk\s+(\d)\b/i
-    ];
-
-    for (const pattern of positionalPatterns) {
-      const match = normalizedQuery.match(pattern);
-      if (match && ['1', '2', '3'].includes(match[1])) {
-        // Verify this is in property context
-        const context = normalizedQuery.substring(0, match.index);
-        if (this.isPropertyContext(context)) {
-          console.log(`✅ Found POSITIONAL BHK with context: ${match[1]}BHK`);
-          return match[1];
-        }
-      }
-    }
-
-    // Handle "X BHK" at the beginning of query
-    const startPattern = /^(\d)\s*bhk/i;
-    const startMatch = normalizedQuery.match(startPattern);
-    if (startMatch && ['1', '2', '3'].includes(startMatch[1])) {
-      console.log(`✅ Found STARTING BHK: ${startMatch[1]}BHK`);
-      return startMatch[1];
-    }
-
-    // Handle queries like "I want 2 bhk" with number before BHK context
-    const wantPattern = /(?:want|need|looking for|searching for|find)\s+(\d)\s*(?:bhk|bedroom|bed)/i;
-    const wantMatch = normalizedQuery.match(wantPattern);
-    if (wantMatch && ['1', '2', '3'].includes(wantMatch[1])) {
-      console.log(`✅ Found INTENT BHK: ${wantMatch[1]}BHK`);
-      return wantMatch[1];
-    }
-
-    // Handle range queries like "2-3 bhk" - take the first number
-    const rangePattern = /(\d)\s*[-–]\s*(\d)\s*bhk/i;
-    const rangeMatch = normalizedQuery.match(rangePattern);
-    if (rangeMatch && ['1', '2', '3'].includes(rangeMatch[1])) {
-      console.log(`✅ Found RANGE BHK (taking first): ${rangeMatch[1]}BHK`);
-      return rangeMatch[1];
-    }
-
-    // FINAL FALLBACK: Only extract standalone numbers in VERY clear property context
-    if (this.isVeryClearPropertyQuery(normalizedQuery)) {
-      const standalonePatterns = [
-        /\b(\d)\s+(?:bhk|bedroom|bed|room)\b/i,
-        /\b(?:bhk|bedroom|bed|room)\s+(\d)\b/i,
-        /\b(\d)(?:\s*)?(?:bhk|bedroom|bed)\b/i
-      ];
-
-      for (const pattern of standalonePatterns) {
-        const match = normalizedQuery.match(pattern);
-        if (match && ['1', '2', '3'].includes(match[1])) {
-          console.log(`✅ Found FALLBACK BHK: ${match[1]}BHK`);
-          return match[1];
-        }
-      }
-    }
-
-    console.log('❌ No BHK found - query too ambiguous');
-    return null;
-  }
-
-  // Strict property context check
-  isPropertyContext(text) {
-    const propertyIndicators = [
-      'flat', 'apartment', 'house', 'property', 'home', 'residence',
-      'pune', 'mumbai', 'buy', 'rent', 'looking', 'searching', 'want',
-      'need', 'find', 'show', 'list'
-    ];
-    return propertyIndicators.some(indicator => 
-      text.includes(indicator)
-    );
-  }
-
-  // Very strict property query detection for fallback
-  isVeryClearPropertyQuery(query) {
-    const clearPropertyPatterns = [
-      /(?:flat|apartment|house|property).*(?:\d\s*bhk|\d\s*bedroom)/i,
-      /(?:\d\s*bhk|\d\s*bedroom).*(?:flat|apartment|house|property)/i,
-      /(?:looking|searching|want|need).*(?:\d\s*bhk|\d\s*bedroom)/i,
-      /(?:pune|mumbai).*(?:\d\s*bhk|\d\s*bedroom)/i,
-      /(?:\d\s*bhk|\d\s*bedroom).*(?:pune|mumbai)/i
-    ];
-
-    return clearPropertyPatterns.some(pattern => pattern.test(query));
-  }
-
-  // Helper to check if this is clearly a property query
-  isPropertyQuery(query) {
-    const propertyContext = [
-      'flat', 'apartment', 'house', 'property', 'home',
-      'pune', 'mumbai', 'lakh', 'cr', 'crore', 'budget',
-      'ready', 'construction', 'possession', 'buy', 'rent'
-    ];
-    
-    return propertyContext.some(context => query.includes(context));
-  }
-
-  // Semantic property intent detection
   hasSemanticPropertyIntent(query) {
     const semanticPatterns = [
       /(?:looking|searching|finding|want|need).*(?:place|stay|live|reside)/i,
@@ -318,6 +197,276 @@ class QueryParser {
     ];
     
     return semanticPatterns.some(pattern => pattern.test(query));
+  }
+
+  // Check for BHK intent
+  hasBHKIntent(query) {
+    const bhkPatterns = [
+      /\b(\d)\s*bhk\b/i,
+      /\b(\d)bhk\b/i,
+      /\b(\d)\s*bedroom\b/i,
+      /\b(\d)\s*bed\b/i,
+      /\b(\d)\s*room\b/i,
+      /\b(\d)\s*rk\b/i
+    ];
+    
+    return bhkPatterns.some(pattern => query.match(pattern));
+  }
+
+  // Enhanced irrelevant query detection
+  isClearlyIrrelevantQuery(query) {
+    const irrelevantPatterns = [
+      /(joke|funny|humor|weather|temperature|forecast)/i,
+      /(news|headlines|update|time|date|day)/i,
+      /(calculate|math|addition|who is|what is|when is)/i,
+      /(how.*work|how.*built|how.*made|api|endpoint)/i,
+      /(movie|film|entertainment|sport|game|player)/i,
+      /(music|song|artist|food|restaurant|recipe)/i,
+      /(travel|tourist|hotel|health|doctor|medical)/i,
+      /(education|school|college|politics|government)/i,
+      /^(hi|hello|hey|greetings)/i,
+      /^(how are you|what's up|sup|good morning)/i
+    ];
+
+    return irrelevantPatterns.some(pattern => pattern.test(query));
+  }
+
+  // Extract unsupported city for better error messages
+  extractUnsupportedCity(query) {
+    const unsupportedCities = [
+      'delhi', 'bangalore', 'hyderabad', 'chennai', 'kolkata',
+      'ahmedabad', 'surat', 'jaipur', 'lucknow', 'kanpur',
+      'noida', 'gurgaon', 'faridabad', 'ghaziabad', 'indore',
+      'bhopal', 'nagpur', 'kochi', 'coimbatore', 'visakhapatnam'
+    ];
+
+    return unsupportedCities.find(city => query.includes(city)) || 'unknown';
+  }
+
+  // Check for unsupported cities
+  hasUnsupportedCities(query) {
+    const unsupportedCities = [
+      'delhi', 'bangalore', 'hyderabad', 'chennai', 'kolkata',
+      'ahmedabad', 'surat', 'jaipur', 'lucknow', 'kanpur',
+      'noida', 'gurgaon', 'faridabad', 'ghaziabad', 'indore',
+      'bhopal', 'nagpur', 'kochi', 'coimbatore', 'visakhapatnam'
+    ];
+    return unsupportedCities.some(city => query.includes(city));
+  }
+
+  // Enhanced BHK extraction with all supported types
+  extractExactBHK(query) {
+    console.log('🛏️ Extracting BHK from:', query);
+
+    const range = this.extractBHKRange(query);
+    if (range) {
+      return range.values[0];
+    }
+
+    const bhkPatterns = [
+      /\b(\d(?:\.\d)?)\s*bhk\b/i,
+      /\b(\d(?:\.\d)?)bhk\b/i,
+      /\b(\d(?:\.\d)?)\s*bedroom\b/i,
+      /\b(\d(?:\.\d)?)\s*bed\b/i,
+      /\b(\d(?:\.\d)?)\s*b\s*h\s*k\b/i,
+      /\b(\d(?:\.\d)?)\s*b\s*r\b/i,
+      /\b(\d)\s*rk\b/i,
+      /\b(\d)rk\b/i,
+      /\broom\s*kitchen\b/i,
+      /\b(one)\s*bhk\b/i,
+      /\b(two)\s*bhk\b/i,
+      /\b(three)\s*bhk\b/i,
+      /\b(four)\s*bhk\b/i,
+      /\b(five)\s*bhk\b/i,
+    ];
+
+    for (const pattern of bhkPatterns) {
+      const match = query.match(pattern);
+      if (match) {
+        let bhk = match[1];
+        
+        if (isNaN(bhk)) {
+          const numberMap = {
+            'one': '1', 'two': '2', 'three': '3', 
+            'four': '4', 'five': '5'
+          };
+          bhk = numberMap[bhk.toLowerCase()] || bhk;
+        }
+
+        if (query.includes('rk') || query.includes('room kitchen')) {
+          return '1RK';
+        }
+
+        console.log(`✅ Found BHK with pattern: ${bhk}BHK`);
+        return bhk;
+      }
+    }
+
+    return null;
+  }
+
+  // Enhanced BHK range extraction
+  extractBHKRange(query) {
+    const rangePatterns = [
+      /(\d(?:\.\d)?)\s*(?:-|to|–)\s*(\d(?:\.\d)?)\s*bhk/i,
+      /(\d(?:\.\d)?)\s*(?:\/|or)\s*(\d(?:\.\d)?)\s*bhk/i,
+      /(\d(?:\.\d)?)\s*bhk\s*(?:or|\/)\s*(\d(?:\.\d)?)\s*bhk/i,
+      /(1rk|1bhk)\s*(?:or|\/)\s*(1rk|1bhk)/i
+    ];
+
+    for (const pattern of rangePatterns) {
+      const match = query.match(pattern);
+      if (match) {
+        let bhks = [];
+        
+        if (match[1].includes('rk') || match[2].includes('rk')) {
+          if (match[1].includes('rk') || match[1].includes('1')) bhks.push('1RK');
+          if (match[2].includes('rk') || match[2].includes('1')) bhks.push('1');
+        } else {
+          bhks = [match[1], match[2]].filter(bhk => 
+            this.isSupportedBHK(bhk)
+          );
+        }
+        
+        if (bhks.length > 0) {
+          return {
+            isRange: true,
+            values: bhks,
+            originalText: match[0]
+          };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  // Extract ambiguous budgets (missing units)
+  extractAmbiguousBudget(query) {
+    const ambiguousPatterns = [
+      /(?:under|below|less than|upto|budget)\s*₹?\s*(\d+(?:\.\d+)?)(?:\s*(?:lakh|lac|cr|crore))?\b/i,
+      /(?:around|about|approximately)\s*₹?\s*(\d+(?:\.\d+)?)(?:\s*(?:lakh|lac|cr|crore))?\b/i
+    ];
+
+    for (const pattern of ambiguousPatterns) {
+      const match = query.match(pattern);
+      if (match && !query.match(/(lakh|lac|cr|crore)/i)) {
+        const amount = parseFloat(match[1]);
+        
+        let likelyUnit = 'lakh';
+        let suggestedAmount = amount;
+        
+        if (amount < 10) {
+          likelyUnit = 'cr';
+          suggestedAmount = amount * 100;
+        } else if (amount > 100) {
+          likelyUnit = 'lakh';
+        }
+
+        return {
+          amount: amount,
+          likelyUnit: likelyUnit,
+          suggestedMaxPrice: likelyUnit === 'cr' ? amount * 10000000 : amount * 100000,
+          needsClarification: true
+        };
+      }
+    }
+
+    return null;
+  }
+
+  // Extract localities from query
+  extractLocalities(query) {
+    const commonLocalities = [
+      'hinjewadi', 'wakad', 'kharadi', 'viman nagar', 'baner', 'aundh',
+      'koregaon park', 'kalyani nagar', 'model colony', 'shivajinagar',
+      'hadapsar', 'magarpatta', 'yerwada', 'katraj', 'dadar', 'bandra',
+      'andheri', 'powai', 'chembur', 'ghatkopar', 'lower parel', 'worli'
+    ];
+
+    return commonLocalities.filter(locality => 
+      query.includes(locality)
+    );
+  }
+
+  // Extract OR conditions from query
+  extractOrConditions(query) {
+    const orPatterns = [
+      /(\w+)\s+or\s+(\w+)/gi,
+      /(\w+)\s*\/\s*(\w+)/gi
+    ];
+
+    const conditions = {};
+
+    orPatterns.forEach(pattern => {
+      let match;
+      while ((match = pattern.exec(query)) !== null) {
+        const [fullMatch, option1, option2] = match;
+        
+        if (this.supportedCities.includes(option1) && this.supportedCities.includes(option2)) {
+          conditions.cities = [option1, option2];
+        }
+        
+        if (this.supportedBHKs.includes(option1) && this.supportedBHKs.includes(option2)) {
+          conditions.bhks = [option1, option2];
+        }
+      }
+    });
+
+    return Object.keys(conditions).length > 0 ? conditions : null;
+  }
+
+  // Identify missing filters for vague queries
+  identifyMissingFilters(query, hasPropertyIntent, hasBHKIntent, hasBudgetIntent) {
+    const missing = [];
+
+    if (!hasBHKIntent) missing.push('BHK configuration');
+    if (!hasBudgetIntent) missing.push('budget range');
+    if (!this.extractExactCity(query)) missing.push('city/location');
+
+    return missing;
+  }
+
+  // Detect multiple queries in one message
+  hasMultipleQueries(query) {
+    const multipleQueryIndicators = [
+      /(?:and|&)\s*(?:2|3)bhk/i,
+      /pune\s+(?:and|&)\s+mumbai/i,
+      /show\s+.*\s+and\s+.*/i
+    ];
+
+    return multipleQueryIndicators.some(pattern => pattern.test(query));
+  }
+
+  // Check if query is too vague
+  isTooVagueQuery(query, hasPropertyIntent, hasBHKIntent, hasBudgetIntent) {
+    const hasOnlyCity = (query.includes('pune') || query.includes('mumbai')) && 
+                       !hasPropertyIntent && !hasBHKIntent && !hasBudgetIntent;
+    
+    const onlySingleNumber = /^\d+$/.test(query.trim());
+    
+    const locationOnly = this.isLocationOnlyQuery(query);
+    
+    return hasOnlyCity || onlySingleNumber || locationOnly;
+  }
+
+  // Check if query contains only location names
+  isLocationOnlyQuery(query) {
+    const locationKeywords = [
+      'pune', 'mumbai', 'hinjewadi', 'wakad', 'kharadi', 'viman nagar',
+      'baner', 'aundh', 'koregaon park', 'kalyani nagar', 'model colony',
+      'shivajinagar', 'hadapsar', 'magarpatta', 'yerwada', 'katraj',
+      'dadar', 'bandra', 'andheri', 'powai', 'chembur', 'ghatkopar'
+    ];
+    
+    const words = query.split(/\s+/);
+    const hasLocation = words.some(word => locationKeywords.includes(word));
+    const hasOnlyLocation = words.every(word => 
+      locationKeywords.includes(word) || 
+      ['in', 'at', 'near', 'around', 'location', 'area'].includes(word)
+    );
+    
+    return hasLocation && hasOnlyLocation;
   }
 
   // City intent detection
@@ -354,8 +503,10 @@ class QueryParser {
            query.match(/(?:budget|price|cost).*\d+/i);
   }
 
-  // EXACT Budget extraction
+  // EXACT Budget extraction - ONLY with explicit units
   extractExactBudget(query) {
+    console.log('💰 Extracting budget from:', query);
+    
     const budgetPatterns = [
       /(?:under|below|less than|upto|within|max|maximum)\s*₹?\s*(\d+(?:\.\d+)?)\s*(cr|lakh|lac|crore)\b/i,
       /₹?\s*(\d+(?:\.\d+)?)\s*(cr|lakh|lac|crore)\b/i,
@@ -381,17 +532,7 @@ class QueryParser {
       }
     }
 
-    // Handle "under X" without explicit unit
-    const underPattern = /under\s*₹?\s*(\d+(?:\.\d+)?)(?:\s*(?:lakh|lac|cr|crore))?\b/i;
-    const underMatch = query.match(underPattern);
-    if (underMatch) {
-      const amount = parseFloat(underMatch[1]);
-      // If amount is less than 10, assume crores, else assume lakhs
-      const maxPrice = amount < 10 ? Math.floor(amount * 10000000) : Math.floor(amount * 100000);
-      console.log(`💰 Found budget (implied unit): ${amount} -> ₹${maxPrice}`);
-      return maxPrice;
-    }
-
+    console.log('❌ No valid budget found (missing explicit unit)');
     return null;
   }
 
@@ -417,66 +558,77 @@ class QueryParser {
     return null;
   }
 
-  // Check for unsupported cities
-  hasUnsupportedCities(query) {
-    const unsupportedCities = [
-      'delhi', 'bangalore', 'hyderabad', 'chennai', 'kolkata',
-      'ahmedabad', 'surat', 'jaipur', 'lucknow', 'kanpur',
-      'noida', 'gurgaon', 'faridabad', 'ghaziabad', 'indore',
-      'bhopal', 'nagpur', 'kochi', 'coimbatore', 'visakhapatnam'
-    ];
-    return unsupportedCities.some(city => query.includes(city));
+  // Method to handle BHK range searches
+  shouldExpandBHKSearch(filters) {
+    return filters.hasMultipleBHK && filters.bhkRange;
   }
 
-  // ADD THIS MISSING FUNCTION - FIXES THE ERROR
+  // Get all BHKs to search for
+  getBHKsToSearch(filters) {
+    if (filters.bhkRange && filters.bhkRange.isRange) {
+      return filters.bhkRange.values;
+    }
+    return filters.bhk ? [filters.bhk] : [];
+  }
+
+  // ENHANCED: Generate appropriate response for all edge cases
+  getIrrelevantResponse(query, filters = {}) {
+    // Unsupported BHK numbers
+    if (filters.unsupportedBHK) {
+      const availableBHKs = filters.availableBHKs || this.getAvailableBHKsForDisplay();
+      return `I only handle properties with ${availableBHKs.join(', ')} configurations. ${filters.unsupportedBHK}BHK is not available in our database. Please search for available BHK types.`;
+    }
+
+    // Unsupported cities
+    if (filters.unsupportedCity) {
+      return `I specialize only in properties in Pune and Mumbai. I don't have information about properties in ${filters.detectedCity}. Would you like to search for properties in Pune or Mumbai instead?`;
+    }
+
+    // Vague queries with specific guidance
+    if (filters.vagueQuery) {
+      const missing = filters.missingFilters || [];
+      const availableBHKs = this.getAvailableBHKsForDisplay();
+      
+      if (missing.length > 0) {
+        return `To help you find the perfect property, I need more details about ${missing.join(' and ')}. Try something like: "2BHK flats in Pune under 80 Lakh" or "Ready to move 3BHK in Mumbai". Available BHKs: ${availableBHKs.join(', ')}`;
+      }
+      
+      return `I'd love to help you find properties! Available configurations: ${availableBHKs.join(', ')}. Try: "2BHK flats in Pune under 80 Lakh" or "Ready to move 3BHK in Mumbai".`;
+    }
+
+    // Multiple queries
+    if (filters.multipleQueries) {
+      const availableBHKs = this.getAvailableBHKsForDisplay();
+      return `I can handle one search at a time to give you the best results. Available BHKs: ${availableBHKs.join(', ')}. Please try one search query, like '2BHK in Pune' or '3BHK in Mumbai under 1.2 Cr'.`;
+    }
+
+    // Ambiguous budget
+    if (filters.needsBudgetClarification && filters.ambiguousBudget) {
+      const { amount, likelyUnit } = filters.ambiguousBudget;
+      return `I see you mentioned a budget of ${amount}. Did you mean ${amount} ${likelyUnit}? Please specify the unit (Lakh or Cr) for accurate results, like "under ${amount} ${likelyUnit}".`;
+    }
+
+    // Clearly irrelevant queries
+    if (filters.queryType === 'irrelevant') {
+      const availableBHKs = this.getAvailableBHKsForDisplay();
+      const irrelevantResponses = [
+        `I'm your specialized property assistant for Pune and Mumbai! Available BHKs: ${availableBHKs.join(', ')}. I'm here to help you find your dream home.`,
+        `I live and breathe Pune and Mumbai properties! Available configurations: ${availableBHKs.join(', ')}. Try: '2BHK under ₹80 Lakh' or 'Ready to move flats in Mumbai'.`,
+        `As your dedicated property search assistant, I'm focused on helping you find homes in Pune and Mumbai. Available BHKs: ${availableBHKs.join(', ')}.`
+      ];
+      return irrelevantResponses[Math.floor(Math.random() * irrelevantResponses.length)];
+    }
+
+    // General fallback
+    const availableBHKs = this.getAvailableBHKsForDisplay();
+    return `I'm here to help you find properties in Pune and Mumbai. Available BHK configurations: ${availableBHKs.join(', ')}. Please ask me about available flats, BHK configurations, budgets, or locations!`;
+  }
+
   shouldProcessQuery(filters) {
     return filters.isRelevant !== false;
-  }
-
-  // ENHANCED: Generate appropriate response for irrelevant queries
-  getIrrelevantResponse(query, filters = {}) {
-    if (filters.unsupportedCity) {
-      const otherCityResponses = [
-        "I specialize only in properties in Pune and Mumbai. While I can't help with properties in other cities, I'd be happy to assist you with finding the perfect home in Pune or Mumbai!",
-        "My expertise is focused on the Pune and Mumbai property markets. I don't have information about other cities, but I can help you explore great options in Pune or Mumbai.",
-        "I'm your dedicated assistant for Pune and Mumbai properties. For other cities, you might want to check local real estate portals. Meanwhile, I can show you some amazing properties in Pune or Mumbai!"
-      ];
-      return otherCityResponses[Math.floor(Math.random() * otherCityResponses.length)];
-    }
-
-    // Handle different types of irrelevant queries
-    if (filters.queryType === 'greeting') {
-      const greetingResponses = [
-        "Hello! I'm your PropBot AI assistant specializing in Pune and Mumbai properties. How can I help you find your dream home today?",
-        "Hi there! I'm here to help you discover the perfect property in Pune or Mumbai. What are you looking for?",
-        "Welcome! I specialize in property search across Pune and Mumbai. Feel free to ask me about flats, budgets, or locations!"
-      ];
-      return greetingResponses[Math.floor(Math.random() * greetingResponses.length)];
-    }
-
-    if (filters.queryType === 'technical') {
-      const technicalResponses = [
-        "I'm focused on helping you find properties in Pune and Mumbai. For technical questions about how I work, please contact our support team!",
-        "As a property search assistant, I specialize in finding homes in Pune and Mumbai. For technical inquiries, our engineering team would be happy to help!",
-        "I'm here to assist with your property search in Pune and Mumbai. For technical details about the platform, please reach out to our support team."
-      ];
-      return technicalResponses[Math.floor(Math.random() * technicalResponses.length)];
-    }
-
-    // General irrelevant queries
-    const generalResponses = [
-      "I'm your intelligent property assistant for Pune and Mumbai! I specialize in helping you find flats, apartments, and homes in these cities. Try asking me about specific BHK requirements, budgets, or locations within Pune or Mumbai.",
-      "I live and breathe Pune and Mumbai properties! While I don't have expertise in other topics, I'd love to help you find your dream home. Try: '2BHK under ₹80 Lakh in Pune' or 'Ready to move flats in Mumbai'.",
-      "As your dedicated property search assistant for Pune and Mumbai, I'm here to help you find the perfect home. Ask me about BHK configurations, budgets, locations, or property status in these cities!",
-      "I'm specialized in Pune and Mumbai real estate. Let me help you navigate the property market in these cities! You can ask about flats, budgets, locations, or specific requirements like '3BHK ready to move in Hinjewadi'.",
-      "Welcome to your Pune-Mumbai property expert! I'm here to make your property search easy. Try queries like 'Properties under ₹1 Cr', '2BHK in Kharadi', or 'Ready to move apartments in Andheri'."
-    ];
-    
-    return generalResponses[Math.floor(Math.random() * generalResponses.length)];
   }
 }
 
 // Create instance and export properly
 const queryParser = new QueryParser();
-
 module.exports = queryParser;
