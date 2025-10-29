@@ -6,18 +6,18 @@ const swaggerUi = require('swagger-ui-express');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// CORS configuration
+// CORS configuration for production
 const corsOptions = {
   origin: [
-    'http://localhost:3000',
-    'http://localhost:5173',
     'https://propbotai-production.up.railway.app',
     'https://propbot-ai.vercel.app',
     'https://*.vercel.app',
-    'https://*.railway.app'
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://localhost:8080'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin'],
   credentials: true,
   optionsSuccessStatus: 200
 };
@@ -65,7 +65,8 @@ app.get('/health', (req, res) => {
     message: 'PropBot AI API is running',
     timestamp: new Date().toISOString(),
     version: '1.0.0',
-    cors: true
+    environment: process.env.NODE_ENV || 'production',
+    base_url: 'https://propbotai-production.up.railway.app'
   });
 });
 
@@ -75,12 +76,20 @@ app.get('/api', (req, res) => {
     name: 'PropBot AI API',
     version: '1.0.0',
     description: 'Intelligent Property Search API for Pune and Mumbai',
+    base_url: 'https://propbotai-production.up.railway.app',
     cors: {
       enabled: true,
-      allowed_origins: ['localhost:3000', 'localhost:5173', 'propbotai-production.up.railway.app', 'vercel.app']
+      allowed_origins: [
+        'https://propbotai-production.up.railway.app',
+        'https://propbot-ai.vercel.app',
+        'http://localhost:3000',
+        'http://localhost:5173'
+      ]
     },
     endpoints: {
+      root: '/',
       health: '/health',
+      api_info: '/api',
       chat: '/api/chat/message',
       chat_base: '/api/chat',
       chat_test: '/api/chat/test',
@@ -107,12 +116,12 @@ const swaggerDocument = {
   },
   servers: [
     {
-      url: `http://localhost:${PORT}`,
-      description: 'Development server'
-    },
-    {
       url: 'https://propbotai-production.up.railway.app',
       description: 'Production server'
+    },
+    {
+      url: `http://localhost:${PORT}`,
+      description: 'Development server'
     }
   ],
   paths: {
@@ -409,10 +418,13 @@ const swaggerDocument = {
                       type: 'string',
                       example: '1.0.0'
                     },
-                    dataLoaded: {
-                      type: 'boolean',
-                      example: true,
-                      description: 'Whether property data is successfully loaded'
+                    environment: {
+                      type: 'string',
+                      example: 'production'
+                    },
+                    base_url: {
+                      type: 'string',
+                      example: 'https://propbotai-production.up.railway.app'
                     }
                   }
                 }
@@ -645,8 +657,9 @@ app.get('/', (req, res) => {
     message: '🚀 PropBot AI Backend is running!',
     description: 'Intelligent Property Search API for Pune and Mumbai',
     version: '1.0.0',
-    cors: 'Enabled for all origins',
-    documentation: `Visit https://propbotai-production.up.railway.app/api-docs for interactive API documentation`,
+    environment: process.env.NODE_ENV || 'production',
+    base_url: 'https://propbotai-production.up.railway.app',
+    documentation: 'Visit https://propbotai-production.up.railway.app/api-docs for interactive API documentation',
     endpoints: {
       root: '/',
       health: '/health',
@@ -687,7 +700,8 @@ app.use((err, req, res, next) => {
     success: false,
     error: 'Internal server error',
     message: 'Something went wrong! Please try again later.',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    base_url: 'https://propbotai-production.up.railway.app'
   });
 });
 
@@ -698,6 +712,7 @@ app.use('*', (req, res) => {
     success: false,
     error: 'Endpoint not found',
     message: `Route ${req.originalUrl} does not exist`,
+    base_url: 'https://propbotai-production.up.railway.app',
     available_endpoints: {
       root: '/',
       health: '/health',
@@ -717,8 +732,8 @@ app.listen(PORT, () => {
   console.log(`   🚀 PropBot AI API Server Started`);
   console.log(`   📍 Port: ${PORT}`);
   console.log(`   🌐 Environment: Production`);
-  console.log(`   🔗 URL: https://propbotai-production.up.railway.app`);
-  console.log(`   🔧 CORS: Enabled for all origins`);
+  console.log(`   🔗 Public URL: https://propbotai-production.up.railway.app`);
+  console.log(`   🔧 CORS: Enabled for production origins`);
   console.log(`✨ ========================================\n`);
   
   console.log(`📚 API Documentation:`);
@@ -737,9 +752,10 @@ app.listen(PORT, () => {
   console.log(`   🏗️ "Under construction properties in Mumbai"`);
   console.log(`   💰 "Properties under 1 Cr"\n`);
   
-  console.log(`⚡ Usage:`);
-  console.log(`   Use Swagger UI for interactive testing`);
-  console.log(`   Or send POST requests to /api/chat/message\n`);
+  console.log(`⚡ Usage Examples:`);
+  console.log(`   curl -X POST https://propbotai-production.up.railway.app/api/chat/message \\`);
+  console.log(`        -H "Content-Type: application/json" \\`);
+  console.log(`        -d '{"message": "2BHK in Pune under 80 Lakh"}'\n`);
   
   console.log(`🔧 Features:`);
   console.log(`   ✅ Exact BHK matching (no cross-BHK results)`);
