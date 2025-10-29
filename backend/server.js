@@ -6,13 +6,33 @@ const swaggerUi = require('swagger-ui-express');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// CORS configuration
+const corsOptions = {
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'https://propbotai-production.up.railway.app',
+    'https://propbot-ai.vercel.app',
+    'https://*.vercel.app',
+    'https://*.railway.app'
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
+
+// Handle preflight requests
+app.options('*', cors(corsOptions));
 
 // Request logging middleware
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  console.log(`Origin: ${req.headers.origin}`);
   next();
 });
 
@@ -44,7 +64,8 @@ app.get('/health', (req, res) => {
     status: 'OK', 
     message: 'PropBot AI API is running',
     timestamp: new Date().toISOString(),
-    version: '1.0.0'
+    version: '1.0.0',
+    cors: true
   });
 });
 
@@ -54,6 +75,10 @@ app.get('/api', (req, res) => {
     name: 'PropBot AI API',
     version: '1.0.0',
     description: 'Intelligent Property Search API for Pune and Mumbai',
+    cors: {
+      enabled: true,
+      allowed_origins: ['localhost:3000', 'localhost:5173', 'propbotai-production.up.railway.app', 'vercel.app']
+    },
     endpoints: {
       health: '/health',
       chat: '/api/chat/message',
@@ -620,6 +645,7 @@ app.get('/', (req, res) => {
     message: '🚀 PropBot AI Backend is running!',
     description: 'Intelligent Property Search API for Pune and Mumbai',
     version: '1.0.0',
+    cors: 'Enabled for all origins',
     documentation: `Visit https://propbotai-production.up.railway.app/api-docs for interactive API documentation`,
     endpoints: {
       root: '/',
@@ -692,6 +718,7 @@ app.listen(PORT, () => {
   console.log(`   📍 Port: ${PORT}`);
   console.log(`   🌐 Environment: Production`);
   console.log(`   🔗 URL: https://propbotai-production.up.railway.app`);
+  console.log(`   🔧 CORS: Enabled for all origins`);
   console.log(`✨ ========================================\n`);
   
   console.log(`📚 API Documentation:`);
