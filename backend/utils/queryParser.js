@@ -5,7 +5,7 @@ class QueryParser {
     
     console.log('🔍 Parsing query:', cleanQuery);
 
-    // Enhanced property intent detection with semantic understanding
+    // Enhanced property intent detection
     const propertyKeywords = [
       'bhk', 'flat', 'apartment', 'house', 'property', 'properties',
       'home', 'residential', 'commercial', 'buy', 'purchase', 'find',
@@ -35,13 +35,13 @@ class QueryParser {
 
     filters.isRelevant = true;
 
-    // EXACT BHK Matching with edge cases
+    // EXACT BHK Matching - FIXED LOGIC
     filters.bhk = this.extractExactBHK(cleanQuery);
 
-    // City extraction with edge cases
+    // City extraction
     filters.city = this.extractExactCity(cleanQuery);
 
-    // Budget extraction with edge cases
+    // Budget extraction
     const budget = this.extractExactBudget(cleanQuery);
     if (budget) filters.maxPrice = budget;
 
@@ -55,6 +55,106 @@ class QueryParser {
     return filters;
   }
 
+  // EXACT BHK extraction - CORRECTED VERSION
+  extractExactBHK(query) {
+    console.log('🛏️ Extracting BHK from:', query);
+    
+    // First, try to find exact BHK patterns
+    const bhkPatterns = [
+      // Pattern: "2 bhk", "3 bhk flat", "1 bhk apartment"
+      /\b(\d)\s*bhk\b/i,
+      
+      // Pattern: "2bhk", "3bhk flat", "1bhk apartment"  
+      /\b(\d)bhk\b/i,
+      
+      // Pattern: "2 bedroom", "3 bedroom flat"
+      /\b(\d)\s*bedroom\b/i,
+      
+      // Pattern: "2 bed", "3 bed flat"
+      /\b(\d)\s*bed\b/i,
+      
+      // Pattern: "2 b h k", "3 b.h.k"
+      /\b(\d)\s*b\s*\.?\s*h\s*\.?\s*k\b/i,
+      
+      // Pattern: "2 b r", "3 b/r"
+      /\b(\d)\s*b\s*\.?\s*r\b/i,
+      
+      // Pattern: "2 rk", "3 rk flat"
+      /\b(\d)\s*rk\b/i,
+    ];
+
+    for (const pattern of bhkPatterns) {
+      const match = query.match(pattern);
+      if (match) {
+        const bhk = match[1];
+        if (['1', '2', '3'].includes(bhk)) {
+          console.log(`✅ Found EXACT BHK with pattern ${pattern}: ${bhk}BHK`);
+          return bhk;
+        }
+      }
+    }
+
+    // Handle word numbers: "one bhk", "two bhk", "three bhk"
+    const wordPatterns = [
+      /\b(one)\s*bhk\b/i,
+      /\b(two)\s*bhk\b/i, 
+      /\b(three)\s*bhk\b/i,
+      /\b(one)\s*bedroom\b/i,
+      /\b(two)\s*bedroom\b/i,
+      /\b(three)\s*bedroom\b/i
+    ];
+
+    for (const pattern of wordPatterns) {
+      const match = query.match(pattern);
+      if (match) {
+        const numberMap = { 'one': '1', 'two': '2', 'three': '3' };
+        const bhk = numberMap[match[1].toLowerCase()];
+        console.log(`✅ Found WORD BHK: ${bhk}BHK`);
+        return bhk;
+      }
+    }
+
+    // Handle positional patterns: "bhk 2", "bedroom 3"
+    const positionalPatterns = [
+      /bhk\s*(\d)\b/i,
+      /bedroom\s*(\d)\b/i,
+      /bed\s*(\d)\b/i,
+      /rk\s*(\d)\b/i
+    ];
+
+    for (const pattern of positionalPatterns) {
+      const match = query.match(pattern);
+      if (match && ['1', '2', '3'].includes(match[1])) {
+        console.log(`✅ Found POSITIONAL BHK: ${match[1]}BHK`);
+        return match[1];
+      }
+    }
+
+    // Handle standalone numbers in property context
+    if (this.isPropertyQuery(query)) {
+      const standaloneNumbers = query.match(/\b(1|2|3)\b/);
+      if (standaloneNumbers) {
+        const bhk = standaloneNumbers[1];
+        console.log(`✅ Found STANDALONE BHK in property context: ${bhk}BHK`);
+        return bhk;
+      }
+    }
+
+    console.log('❌ No BHK found');
+    return null;
+  }
+
+  // Helper to check if this is clearly a property query
+  isPropertyQuery(query) {
+    const propertyContext = [
+      'flat', 'apartment', 'house', 'property', 'home',
+      'pune', 'mumbai', 'lakh', 'cr', 'crore', 'budget',
+      'ready', 'construction', 'possession'
+    ];
+    
+    return propertyContext.some(context => query.includes(context));
+  }
+
   // Semantic property intent detection
   hasSemanticPropertyIntent(query) {
     const semanticPatterns = [
@@ -65,62 +165,6 @@ class QueryParser {
     ];
     
     return semanticPatterns.some(pattern => pattern.test(query));
-  }
-
-  // EXACT BHK extraction with all edge cases
-  extractExactBHK(query) {
-    const bhkPatterns = [
-      // Standard patterns
-      /\b(\d)\s*bhk\b/i,
-      /\b(\d)bhk\b/i,
-      /\b(\d)\s*bedroom\b/i,
-      /\b(\d)\s*bed\s*room\b/i,
-      /\b(\d)\s*bed\b/i,
-      /bhk\s*(\d)\b/i,
-      /\b(\d)\s*b\.?h\.?k\b/i,
-      
-      // Edge cases
-      /\b(one|two|three)\s*bhk\b/i,
-      /\b(1|2|3)\s*room\b/i,
-      /\b(1|2|3)\s*rk\b/i,
-      /\b(1|2|3)\s*b\/?r\b/i,
-      /\b(1|2|3)\s*b\s*&?\s*h\s*&?\s*k\b/i,
-    ];
-
-    for (const pattern of bhkPatterns) {
-      const match = query.match(pattern);
-      if (match) {
-        let bhk = match[1];
-        
-        // Handle word numbers
-        if (isNaN(bhk)) {
-          const numberMap = { 'one': '1', 'two': '2', 'three': '3' };
-          bhk = numberMap[bhk.toLowerCase()] || bhk;
-        }
-        
-        // Validate it's 1, 2, or 3
-        if (['1', '2', '3'].includes(bhk)) {
-          console.log(`✅ Found EXACT BHK: ${bhk}BHK`);
-          return bhk;
-        }
-      }
-    }
-
-    // Check for BHK in different positions
-    const positionalPatterns = [
-      /(\d)(?:\s*)?(?:bhk|bedroom|bed)/i,
-      /(?:bhk|bedroom|bed)(?:\s*)?(\d)/i
-    ];
-
-    for (const pattern of positionalPatterns) {
-      const match = query.match(pattern);
-      if (match && ['1', '2', '3'].includes(match[1])) {
-        console.log(`✅ Found EXACT BHK (positional): ${match[1]}BHK`);
-        return match[1];
-      }
-    }
-
-    return null;
   }
 
   // City intent detection
@@ -157,19 +201,13 @@ class QueryParser {
            query.match(/(?:budget|price|cost).*\d+/i);
   }
 
-  // EXACT Budget extraction with edge cases
+  // EXACT Budget extraction
   extractExactBudget(query) {
     const budgetPatterns = [
-      // Standard patterns
       /(?:under|below|less than|upto|within|max|maximum)\s*₹?\s*(\d+(?:\.\d+)?)\s*(cr|lakh|lac|crore)\b/i,
       /₹?\s*(\d+(?:\.\d+)?)\s*(cr|lakh|lac|crore)\b/i,
       /budget\s*₹?\s*(\d+(?:\.\d+)?)\s*(cr|lakh|lac)/i,
       /\b(\d+(?:\.\d+)?)\s*(lakh|lac|cr|crore)\b/i,
-      
-      // Edge cases
-      /(?:around|about|approximately)\s*₹?\s*(\d+)\s*(lakh|lac|cr)/i,
-      /(\d+)\s*(?:to|\-)\s*(\d+)\s*(lakh|lac)/i,
-      /(?:price|cost)\s*:?\s*₹?\s*(\d+)\s*(lakh|lac)/i,
     ];
 
     for (const pattern of budgetPatterns) {
@@ -177,12 +215,6 @@ class QueryParser {
       if (match) {
         let amount = parseFloat(match[1]);
         let unit = match[2].toLowerCase();
-
-        // Handle range (take the upper limit)
-        if (match[3] && match[4]) {
-          amount = parseFloat(match[3]); // Take the higher number in range
-          unit = match[4].toLowerCase();
-        }
 
         if (unit.includes('cr') || unit.includes('crore')) {
           const maxPrice = Math.floor(amount * 10000000);
@@ -196,7 +228,7 @@ class QueryParser {
       }
     }
 
-    // Handle "under X" without explicit unit (assume lakhs)
+    // Handle "under X" without explicit unit
     const underPattern = /under\s*₹?\s*(\d+(?:\.\d+)?)(?:\s*(?:lakh|lac|cr|crore))?\b/i;
     const underMatch = query.match(underPattern);
     if (underMatch) {
@@ -241,11 +273,6 @@ class QueryParser {
     return unsupportedCities.some(city => query.includes(city));
   }
 
-  // Helper to check if query should be processed
-  shouldProcessQuery(filters) {
-    return filters.isRelevant !== false;
-  }
-
   // Generate appropriate response for irrelevant queries
   getIrrelevantResponse(query, filters = {}) {
     if (filters.unsupportedCity) {
@@ -255,8 +282,7 @@ class QueryParser {
     const responses = [
       "I'm an intelligent assistant specialized in properties in Pune and Mumbai. I have no expertise about your current question. Try asking me about flats, BHKs, or properties in these cities!",
       "I specialize exclusively in property search for Pune and Mumbai. I don't have knowledge about other topics. Ask me about 2BHK flats, properties under ₹1 Cr, or ready-to-move homes in these cities!",
-      "My expertise is limited to properties in Pune and Mumbai. I can't help with other questions. Try: '3BHK in Pune under ₹1.2 Cr' or 'Ready flats in Mumbai'",
-      "I'm designed specifically for property search in Pune and Mumbai. I have no expertise about your question. Looking for properties? I can help you find flats and apartments in these cities!"
+      "My expertise is limited to properties in Pune and Mumbai. I can't help with other questions. Try: '3BHK in Pune under ₹1.2 Cr' or 'Ready flats in Mumbai'"
     ];
     
     return responses[Math.floor(Math.random() * responses.length)];
