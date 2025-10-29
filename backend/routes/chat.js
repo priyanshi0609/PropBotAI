@@ -1,6 +1,7 @@
 const express = require('express');
 const { csvParser } = require('../utils/csvParser');
-const { queryParser } = require('../utils/queryParser');
+const queryParser = require('../utils/queryParser');
+
 const { searchEngine } = require('../utils/searchEngine');
 
 const router = express.Router();

@@ -4,7 +4,7 @@ const chatRoutes = require('./routes/chat');
 const swaggerUi = require('swagger-ui-express');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT ||  5001;
 
 // CORS configuration for production
 const corsOptions = {
@@ -14,7 +14,8 @@ const corsOptions = {
     'https://*.vercel.app',
     'http://localhost:3000',
     'http://localhost:5173',
-    'http://localhost:8080'
+    'http://localhost:8080',
+    'http://localhost:5001'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin'],
@@ -83,7 +84,8 @@ app.get('/api', (req, res) => {
         'https://propbotai-production.up.railway.app',
         'https://propbot-ai.vercel.app',
         'http://localhost:3000',
-        'http://localhost:5173'
+        'http://localhost:5173',
+        'http://localhost:5001'
       ]
     },
     endpoints: {
