@@ -6,12 +6,15 @@ const swaggerUi = require('swagger-ui-express');
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-// CORS configuration for production - UPDATED with nobrokerage domain
+const BACKEND_URL = 'https://propbotai.onrender.com';
+const FRONTEND_URL = 'https://nobrokerage-ai.vercel.app';
+
+// CORS configuration for production
 const corsOptions = {
   origin: [
-    'https://propbotai-production.up.railway.app',
+    BACKEND_URL,
     'https://propbot-ai.vercel.app',
-    'https://nobrokerage-ai.vercel.app', // ADDED THIS
+    FRONTEND_URL,
     'https://*.vercel.app',
     'http://localhost:3000',
     'http://localhost:5173',
@@ -32,7 +35,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Handle preflight requests
 app.options('*', cors(corsOptions));
 
-// Security headers middleware - ADD THIS
+// Security headers middleware
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -79,8 +82,8 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     version: '1.0.0',
     environment: process.env.NODE_ENV || 'production',
-    base_url: 'https://propbotai-production.up.railway.app',
-    frontend_url: 'https://nobrokerage-ai.vercel.app' // ADDED THIS
+    base_url: BACKEND_URL,
+    frontend_url: FRONTEND_URL
   });
 });
 
@@ -90,14 +93,14 @@ app.get('/api', (req, res) => {
     name: 'propbot AI API',
     version: '1.0.0',
     description: 'Intelligent Property Search API for Pune and Mumbai',
-    base_url: 'https://propbotai-production.up.railway.app',
-    frontend_url: 'https://nobrokerage-ai.vercel.app', // ADDED THIS
+    base_url: BACKEND_URL,
+    frontend_url: FRONTEND_URL,
     cors: {
       enabled: true,
       allowed_origins: [
-        'https://propbotai-production.up.railway.app',
+        BACKEND_URL,
         'https://propbot-ai.vercel.app',
-        'https://nobrokerage-ai.vercel.app', // ADDED THIS
+        FRONTEND_URL,
         'http://localhost:3000',
         'http://localhost:5173',
         'http://localhost:5001'
@@ -133,7 +136,7 @@ const swaggerDocument = {
   },
   servers: [
     {
-      url: 'https://propbotai-production.up.railway.app',
+      url: BACKEND_URL,
       description: 'Production server'
     },
     {
@@ -441,7 +444,7 @@ const swaggerDocument = {
                     },
                     base_url: {
                       type: 'string',
-                      example: 'https://propbotai-production.up.railway.app'
+                      example: BACKEND_URL
                     }
                   }
                 }
@@ -675,9 +678,9 @@ app.get('/', (req, res) => {
     description: 'Intelligent Property Search API for Pune and Mumbai',
     version: '1.0.0',
     environment: process.env.NODE_ENV || 'production',
-    base_url: 'https://propbotai-production.up.railway.app',
-    frontend_url: 'https://nobrokerage-ai.vercel.app', // ADDED THIS
-    documentation: 'Visit https://propbotai-production.up.railway.app/api-docs for interactive API documentation',
+    base_url: BACKEND_URL,
+    frontend_url: FRONTEND_URL,
+    documentation: `Visit ${BACKEND_URL}/api-docs for interactive API documentation`,
     endpoints: {
       root: '/',
       health: '/health',
@@ -719,7 +722,7 @@ app.use((err, req, res, next) => {
     error: 'Internal server error',
     message: 'Something went wrong! Please try again later.',
     timestamp: new Date().toISOString(),
-    base_url: 'https://propbotai-production.up.railway.app'
+    base_url: BACKEND_URL
   });
 });
 
@@ -730,7 +733,7 @@ app.use('*', (req, res) => {
     success: false,
     error: 'Endpoint not found',
     message: `Route ${req.originalUrl} does not exist`,
-    base_url: 'https://propbotai-production.up.railway.app',
+    base_url: BACKEND_URL,
     available_endpoints: {
       root: '/',
       health: '/health',
@@ -744,25 +747,25 @@ app.use('*', (req, res) => {
   });
 });
 
-// Start server - IMPORTANT: Bind to 0.0.0.0 for Railway
+// Start server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n✨ ========================================`);
   console.log(`   🚀 propbot AI API Server Started`);
   console.log(`   📍 Port: ${PORT}`);
   console.log(`   🌐 Environment: ${process.env.NODE_ENV || 'production'}`);
-  console.log(`   🔗 Backend URL: https://propbotai-production.up.railway.app`);
-  console.log(`   🔗 Frontend URL: https://nobrokerage-ai.vercel.app`);
+  console.log(`   🔗 Backend URL: ${BACKEND_URL}`);
+  console.log(`   🔗 Frontend URL: ${FRONTEND_URL}`);
   console.log(`   🔧 CORS: Enabled for production origins`);
   console.log(`✨ ========================================\n`);
   
   console.log(`📚 API Documentation:`);
-  console.log(`   🔗 https://propbotai-production.up.railway.app/api-docs\n`);
+  console.log(`   🔗 ${BACKEND_URL}/api-docs\n`);
   
   console.log(`🔍 Test Endpoints:`);
-  console.log(`   ✅ Health Check: https://propbotai-production.up.railway.app/health`);
-  console.log(`   💬 Chat Base: https://propbotai-production.up.railway.app/api/chat`);
-  console.log(`   💬 Chat Test: https://propbotai-production.up.railway.app/api/chat/test`);
-  console.log(`   🏠 API Info: https://propbotai-production.up.railway.app/api\n`);
+  console.log(`   ✅ Health Check: ${BACKEND_URL}/health`);
+  console.log(`   💬 Chat Base: ${BACKEND_URL}/api/chat`);
+  console.log(`   💬 Chat Test: ${BACKEND_URL}/api/chat/test`);
+  console.log(`   🏠 API Info: ${BACKEND_URL}/api\n`);
   
   console.log(`💡 Example Queries for Testing:`);
   console.log(`   🏠 "2BHK in Pune under 80 Lakh"`);
@@ -772,7 +775,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`   💰 "Properties under 1 Cr"\n`);
   
   console.log(`⚡ Usage Examples:`);
-  console.log(`   curl -X POST https://propbotai-production.up.railway.app/api/chat/message \\`);
+  console.log(`   curl -X POST ${BACKEND_URL}/api/chat/message \\`);
   console.log(`        -H "Content-Type: application/json" \\`);
   console.log(`        -d '{"message": "2BHK in Pune under 80 Lakh"}'\n`);
   
