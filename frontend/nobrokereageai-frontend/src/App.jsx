@@ -1,18 +1,70 @@
-// src/App.jsx or pages/index.jsx
-export default function App() {
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
+import ChatInterface from './components/chat/ChatInterface';
+import Login from './components/auth/Login';
+import SignUp from './components/auth/SignUp';
+import Header from './components/layout/Header';
+
+function ProtectedRoute({ children }) {
+  const { currentUser } = useAuth();
+  return currentUser ? children : <Navigate to="/login" />;
+}
+
+function PublicRoute({ children }) {
+  const { currentUser } = useAuth();
+  return !currentUser ? children : <Navigate to="/" />;
+}
+
+function AppContent() {
+  const { currentUser } = useAuth();
+
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <div className="p-8 bg-white rounded-lg shadow-lg text-center">
-        <h1 className="text-3xl font-bold text-teal-600 mb-4">
-          Tailwind is Working! ✅
-        </h1>
-        <p className="text-gray-700">
-          If you can see this styled component, Tailwind CSS is correctly installed.
-        </p>
-        <button className="mt-4 px-6 py-2 bg-white text-white rounded hover:bg-teal-600">
-          Test Button
-        </button>
-      </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
+      {currentUser && <Header />}
+      <Routes>
+        <Route 
+          path="/login" 
+          element={
+            <PublicRoute>
+              <Login />
+            </PublicRoute>
+          } 
+        />
+        <Route 
+          path="/signup" 
+          element={
+            <PublicRoute>
+              <SignUp />
+            </PublicRoute>
+          } 
+        />
+        <Route 
+          path="/" 
+          element={
+            <ProtectedRoute>
+              <ChatInterface />
+            </ProtectedRoute>
+          } 
+        />
+        {/* Catch all route */}
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
     </div>
   );
 }
+
+function App() {
+  return (
+    <ThemeProvider>
+      <AuthProvider>
+        <Router>
+          <AppContent />
+        </Router>
+      </AuthProvider>
+    </ThemeProvider>
+  );
+}
+
+export default App;
