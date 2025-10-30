@@ -27,9 +27,12 @@ export function AuthProvider({ children }) {
   function signup(email, password, displayName) {
     return createUserWithEmailAndPassword(auth, email, password)
       .then((result) => {
-        return updateProfile(result.user, {
-          displayName: displayName
-        });
+        if (displayName) {
+          return updateProfile(result.user, {
+            displayName: displayName
+          });
+        }
+        return result;
       });
   }
 

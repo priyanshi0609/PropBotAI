@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { auth } from '../firebase'; // Adjust path to your firebase config
 import { AlertCircle, Mail, Lock, User, Eye, EyeOff, UserPlus } from 'lucide-react';
 
 function SignUp() {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     displayName: '',
     email: '',
@@ -21,7 +25,7 @@ function SignUp() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (formData.password !== formData.confirmPassword) {
@@ -35,13 +39,46 @@ function SignUp() {
     try {
       setError('');
       setLoading(true);
-      // await signup(formData.email, formData.password, formData.displayName);
-      // navigate('/');
-      console.log('Sign up submitted', formData);
-      setTimeout(() => setLoading(false), 1000);
+      
+      // Create user with Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(
+        auth, 
+        formData.email, 
+        formData.password
+      );
+      
+      // Update user profile with display name
+      if (formData.displayName) {
+        await updateProfile(userCredential.user, {
+          displayName: formData.displayName
+        });
+      }
+
+      console.log('User created successfully:', userCredential.user);
+      
+      // Redirect to home page
+      navigate('/');
+      
     } catch (error) {
       console.error('Signup error:', error);
-      setError('Failed to create an account. Please try again.');
+      
+      // Handle specific Firebase errors
+      switch (error.code) {
+        case 'auth/email-already-in-use':
+          setError('This email is already registered. Please sign in instead.');
+          break;
+        case 'auth/invalid-email':
+          setError('Invalid email address format.');
+          break;
+        case 'auth/operation-not-allowed':
+          setError('Email/password sign up is not enabled. Please contact support.');
+          break;
+        case 'auth/weak-password':
+          setError('Password is too weak. Please choose a stronger password.');
+          break;
+        default:
+          setError('Failed to create an account. Please try again.');
+      }
       setLoading(false);
     }
   };
@@ -129,7 +166,7 @@ function SignUp() {
             </div>
 
             {/* Sign Up Form */}
-            <div className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
               {/* Full Name Field */}
               <div>
                 <label htmlFor="displayName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -254,8 +291,7 @@ function SignUp() {
 
               {/* Submit Button */}
               <button
-                type="button"
-                onClick={handleSubmit}
+                type="submit"
                 disabled={loading}
                 className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-medium rounded-xl shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-[#2f2f2f] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 mt-6"
               >
@@ -268,7 +304,7 @@ function SignUp() {
                   'Create account'
                 )}
               </button>
-            </div>
+            </form>
           </div>
 
           {/* Footer */}

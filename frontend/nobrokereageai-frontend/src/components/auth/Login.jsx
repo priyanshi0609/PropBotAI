@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { AlertCircle, Mail, Lock, Eye, EyeOff, LogIn } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { useNavigate, Link } from 'react-router-dom';
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -8,36 +10,89 @@ function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  
+  const { login, signInWithGoogle } = useAuth();
+  const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Basic validation
+    if (!email || !password) {
+      setError('Please fill in all fields');
+      return;
+    }
+
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
     try {
       setError('');
       setLoading(true);
-      // await login(email, password);
-      // navigate('/');
-      console.log('Login submitted');
-      setTimeout(() => setLoading(false), 1000);
+      await login(email, password);
+      navigate('/');
     } catch (error) {
       console.error('Login error:', error);
-      setError('Failed to sign in. Please check your credentials.');
+      
+      // Handle specific Firebase auth errors
+      switch (error.code) {
+        case 'auth/invalid-email':
+          setError('Invalid email address format');
+          break;
+        case 'auth/user-disabled':
+          setError('This account has been disabled');
+          break;
+        case 'auth/user-not-found':
+          setError('No account found with this email');
+          break;
+        case 'auth/wrong-password':
+          setError('Incorrect password');
+          break;
+        case 'auth/too-many-requests':
+          setError('Too many failed attempts. Please try again later');
+          break;
+        default:
+          setError('Failed to sign in. Please check your credentials.');
+      }
+    } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleSignIn = () => {
+  const handleGoogleSignIn = async () => {
     try {
       setError('');
       setGoogleLoading(true);
-      // await signInWithGoogle();
-      // navigate('/');
-      console.log('Google sign in');
-      setTimeout(() => setGoogleLoading(false), 1000);
+      await signInWithGoogle();
+      navigate('/');
     } catch (error) {
       console.error('Google signin error:', error);
-      setError('Failed to sign in with Google. Please try again.');
+      
+      // Handle Google auth errors
+      switch (error.code) {
+        case 'auth/popup-closed-by-user':
+          setError('Sign in was cancelled');
+          break;
+        case 'auth/popup-blocked':
+          setError('Popup was blocked. Please allow popups for this site');
+          break;
+        case 'auth/network-request-failed':
+          setError('Network error. Please check your connection');
+          break;
+        default:
+          setError('Failed to sign in with Google. Please try again.');
+      }
+    } finally {
       setGoogleLoading(false);
+    }
+  };
+
+  // Handle Enter key in password field
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleSubmit(e);
     }
   };
 
@@ -59,7 +114,7 @@ function Login() {
 
         {/* Main Card */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
-          <div className="p-8">
+          <form onSubmit={handleSubmit} className="p-8">
             {/* Error Message */}
             {error && (
               <div className="mb-6 rounded-xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900 p-4">
@@ -74,8 +129,9 @@ function Login() {
 
             {/* Google Sign In */}
             <button
+              type="button"
               onClick={handleGoogleSignIn}
-              disabled={googleLoading}
+              disabled={googleLoading || loading}
               className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-750 transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow"
             >
               {googleLoading ? (
@@ -129,6 +185,7 @@ function Login() {
                     onChange={(e) => setEmail(e.target.value)}
                     className="block w-full pl-11 pr-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     placeholder="you@example.com"
+                    disabled={loading || googleLoading}
                   />
                 </div>
               </div>
@@ -150,18 +207,16 @@ function Login() {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleSubmit(e);
-                      }
-                    }}
+                    onKeyDown={handleKeyDown}
                     className="block w-full pl-11 pr-11 py-3 border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     placeholder="Enter your password"
+                    disabled={loading || googleLoading}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center hover:text-gray-600 dark:hover:text-gray-300 transition-colors disabled:opacity-50"
+                    disabled={loading || googleLoading}
                   >
                     {showPassword ? (
                       <EyeOff className="w-5 h-5 text-gray-400 dark:text-gray-500" />
@@ -174,9 +229,8 @@ function Login() {
 
               {/* Submit Button */}
               <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={loading}
+                type="submit"
+                disabled={loading || googleLoading}
                 className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-medium rounded-xl shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               >
                 {loading ? (
@@ -189,25 +243,25 @@ function Login() {
                 )}
               </button>
             </div>
-          </div>
+          </form>
 
           {/* Footer */}
           <div className="px-8 py-4 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-800">
             <p className="text-center text-sm text-gray-600 dark:text-gray-400">
               Don't have an account?{' '}
-              <a
-                href="/signup"
+              <Link
+                to="/signup"
                 className="font-semibold text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
               >
                 Sign up
-              </a>
+              </Link>
             </p>
           </div>
         </div>
 
         {/* Additional Info */}
         <p className="mt-6 text-center text-xs text-gray-500 dark:text-gray-500">
-          By continuing, you agree to PropBot AI's Terms of Service and Privacy Policy
+          By continuing, you agree to NoBrokerage AI Terms of Service and Privacy Policy
         </p>
       </div>
     </div>
