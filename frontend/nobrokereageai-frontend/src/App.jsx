@@ -25,6 +25,10 @@ function AppContent() {
       {currentUser && <Header />}
       <Routes>
         <Route 
+          path='/try'
+          element={<ChatInterface />}
+        />  
+        <Route 
           path="/login" 
           element={
             <PublicRoute>
