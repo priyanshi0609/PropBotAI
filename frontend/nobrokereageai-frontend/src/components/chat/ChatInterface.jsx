@@ -93,7 +93,7 @@ function ChatInterface() {
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyDown={handleKeyPress}
-                placeholder="Message PropBot AI..."
+                placeholder="Message NoBrokerage AI..."
                 rows={1}
                 className="flex-1 resize-none bg-transparent px-4 py-4 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none text-[15px] max-h-[200px] overflow-y-auto"
                 style={{

@@ -72,7 +72,7 @@ function Header() {
               <Bot className="w-5 h-5 text-white" strokeWidth={2.5} />
             </div>
             <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
-              PropBot AI
+              NoBrokerage AI
             </h1>
           </div>
 

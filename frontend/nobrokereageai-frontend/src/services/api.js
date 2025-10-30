@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://propbotai-production.up.railway.app';
+const API_BASE_URL = 'https://NoBrokerageai-production.up.railway.app';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
