@@ -10,7 +10,7 @@
 
 **Intelligent Property Search Assistant for Pune & Mumbai**
 
-[Live Demo](https://nobrokerage-ai.vercel.app) • [API Docs](https://propbotai.onrender.com/api-docs/) • [Report Bug](https://github.com/your-username/nobrokerage-ai/issues)
+[Live Demo](https://nobrokerage-ai.vercel.app) • [API Docs](https://propbotai.onrender.com/api-docs/) • [Report Bug](https://github.com/priyanshi0609/PropBotAI/issues)
 
 </div>
 
