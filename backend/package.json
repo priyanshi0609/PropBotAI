@@ -1,5 +1,5 @@
 {
-  "name": "NoBrokerage-ai-api",
+  "name": "propbot-ai-api",
   "version": "1.0.0",
   "description": "Intelligent Property Search API for Pune and Mumbai",
   "main": "server.js",

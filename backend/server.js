@@ -4,37 +4,48 @@ const chatRoutes = require('./routes/chat');
 const swaggerUi = require('swagger-ui-express');
 
 const app = express();
-const PORT = process.env.PORT ||  5001;
+const PORT = process.env.PORT || 5001;
 
-// CORS configuration for production
+// CORS configuration for production - UPDATED with nobrokerage domain
 const corsOptions = {
   origin: [
-    'https://NoBrokerageai-production.up.railway.app',
-    'https://NoBrokerage-ai.vercel.app',
+    'https://propbotai-production.up.railway.app',
+    'https://propbot-ai.vercel.app',
+    'https://nobrokerage-ai.vercel.app', // ADDED THIS
     'https://*.vercel.app',
     'http://localhost:3000',
     'http://localhost:5173',
     'http://localhost:8080',
-    'http://localhost:5001',
-    'https://nobrokerage-ai.vercel.app'
+    'http://localhost:5001'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
   credentials: true,
   optionsSuccessStatus: 200
 };
 
 // Middleware
 app.use(cors(corsOptions));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Handle preflight requests
 app.options('*', cors(corsOptions));
+
+// Security headers middleware - ADD THIS
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, Origin, X-Requested-With');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  next();
+});
 
 // Request logging middleware
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
   console.log(`Origin: ${req.headers.origin}`);
+  console.log(`User-Agent: ${req.headers['user-agent']}`);
   next();
 });
 
@@ -45,7 +56,7 @@ app.use('/api/chat', chatRoutes);
 app.get('/api/chat', (req, res) => {
   res.json({
     success: true,
-    message: 'NoBrokerage AI Chat API',
+    message: 'propbot AI Chat API',
     available_endpoints: {
       message: 'POST /api/chat/message - Send chat messages',
       test: 'GET /api/chat/test - Test endpoint'
@@ -64,26 +75,29 @@ app.get('/api/chat', (req, res) => {
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK', 
-    message: 'NoBrokerage AI API is running',
+    message: 'propbot AI API is running',
     timestamp: new Date().toISOString(),
     version: '1.0.0',
     environment: process.env.NODE_ENV || 'production',
-    base_url: 'https://NoBrokerageai-production.up.railway.app'
+    base_url: 'https://propbotai-production.up.railway.app',
+    frontend_url: 'https://nobrokerage-ai.vercel.app' // ADDED THIS
   });
 });
 
 // API info endpoint
 app.get('/api', (req, res) => {
   res.json({
-    name: 'NoBrokerage AI API',
+    name: 'propbot AI API',
     version: '1.0.0',
     description: 'Intelligent Property Search API for Pune and Mumbai',
-    base_url: 'https://NoBrokerageai-production.up.railway.app',
+    base_url: 'https://propbotai-production.up.railway.app',
+    frontend_url: 'https://nobrokerage-ai.vercel.app', // ADDED THIS
     cors: {
       enabled: true,
       allowed_origins: [
-        'https://NoBrokerageai-production.up.railway.app',
-        'https://NoBrokerage-ai.vercel.app',
+        'https://propbotai-production.up.railway.app',
+        'https://propbot-ai.vercel.app',
+        'https://nobrokerage-ai.vercel.app', // ADDED THIS
         'http://localhost:3000',
         'http://localhost:5173',
         'http://localhost:5001'
@@ -105,12 +119,12 @@ app.get('/api', (req, res) => {
 const swaggerDocument = {
   openapi: '3.0.0',
   info: {
-    title: 'NoBrokerage AI API',
+    title: 'propbot AI API',
     description: 'Intelligent Property Search API for Pune and Mumbai. This API processes natural language property search queries and returns matching properties with detailed information.',
     version: '1.0.0',
     contact: {
       name: 'API Support',
-      email: 'support@NoBrokerage.ai'
+      email: 'support@propbot.ai'
     },
     license: {
       name: 'MIT',
@@ -119,7 +133,7 @@ const swaggerDocument = {
   },
   servers: [
     {
-      url: 'https://NoBrokerageai-production.up.railway.app',
+      url: 'https://propbotai-production.up.railway.app',
       description: 'Production server'
     },
     {
@@ -411,7 +425,7 @@ const swaggerDocument = {
                     },
                     message: {
                       type: 'string',
-                      example: 'NoBrokerage AI API is running'
+                      example: 'propbot AI API is running'
                     },
                     timestamp: {
                       type: 'string',
@@ -427,7 +441,7 @@ const swaggerDocument = {
                     },
                     base_url: {
                       type: 'string',
-                      example: 'https://NoBrokerageai-production.up.railway.app'
+                      example: 'https://propbotai-production.up.railway.app'
                     }
                   }
                 }
@@ -493,7 +507,7 @@ const swaggerDocument = {
                     },
                     message: {
                       type: 'string',
-                      example: 'NoBrokerage AI Chat API'
+                      example: 'propbot AI Chat API'
                     },
                     available_endpoints: {
                       type: 'object',
@@ -646,7 +660,7 @@ const swaggerDocument = {
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
   explorer: true,
   customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: "NoBrokerage AI API Documentation",
+  customSiteTitle: "propbot AI API Documentation",
   swaggerOptions: {
     persistAuthorization: true,
     displayRequestDuration: true,
@@ -657,12 +671,13 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
 // Root endpoint
 app.get('/', (req, res) => {
   res.json({ 
-    message: '🚀 NoBrokerage AI Backend is running!',
+    message: '🚀 propbot AI Backend is running!',
     description: 'Intelligent Property Search API for Pune and Mumbai',
     version: '1.0.0',
     environment: process.env.NODE_ENV || 'production',
-    base_url: 'https://NoBrokerageai-production.up.railway.app',
-    documentation: 'Visit https://NoBrokerageai-production.up.railway.app/api-docs for interactive API documentation',
+    base_url: 'https://propbotai-production.up.railway.app',
+    frontend_url: 'https://nobrokerage-ai.vercel.app', // ADDED THIS
+    documentation: 'Visit https://propbotai-production.up.railway.app/api-docs for interactive API documentation',
     endpoints: {
       root: '/',
       health: '/health',
@@ -704,7 +719,7 @@ app.use((err, req, res, next) => {
     error: 'Internal server error',
     message: 'Something went wrong! Please try again later.',
     timestamp: new Date().toISOString(),
-    base_url: 'https://NoBrokerageai-production.up.railway.app'
+    base_url: 'https://propbotai-production.up.railway.app'
   });
 });
 
@@ -715,7 +730,7 @@ app.use('*', (req, res) => {
     success: false,
     error: 'Endpoint not found',
     message: `Route ${req.originalUrl} does not exist`,
-    base_url: 'https://NoBrokerageai-production.up.railway.app',
+    base_url: 'https://propbotai-production.up.railway.app',
     available_endpoints: {
       root: '/',
       health: '/health',
@@ -729,24 +744,25 @@ app.use('*', (req, res) => {
   });
 });
 
-// Start server
-app.listen(PORT, () => {
+// Start server - IMPORTANT: Bind to 0.0.0.0 for Railway
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n✨ ========================================`);
-  console.log(`   🚀 NoBrokerage AI API Server Started`);
+  console.log(`   🚀 propbot AI API Server Started`);
   console.log(`   📍 Port: ${PORT}`);
-  console.log(`   🌐 Environment: Production`);
-  console.log(`   🔗 Public URL: https://NoBrokerageai-production.up.railway.app`);
+  console.log(`   🌐 Environment: ${process.env.NODE_ENV || 'production'}`);
+  console.log(`   🔗 Backend URL: https://propbotai-production.up.railway.app`);
+  console.log(`   🔗 Frontend URL: https://nobrokerage-ai.vercel.app`);
   console.log(`   🔧 CORS: Enabled for production origins`);
   console.log(`✨ ========================================\n`);
   
   console.log(`📚 API Documentation:`);
-  console.log(`   🔗 https://NoBrokerageai-production.up.railway.app/api-docs\n`);
+  console.log(`   🔗 https://propbotai-production.up.railway.app/api-docs\n`);
   
   console.log(`🔍 Test Endpoints:`);
-  console.log(`   ✅ Health Check: https://NoBrokerageai-production.up.railway.app/health`);
-  console.log(`   💬 Chat Base: https://NoBrokerageai-production.up.railway.app/api/chat`);
-  console.log(`   💬 Chat Test: https://NoBrokerageai-production.up.railway.app/api/chat/test`);
-  console.log(`   🏠 API Info: https://NoBrokerageai-production.up.railway.app/api\n`);
+  console.log(`   ✅ Health Check: https://propbotai-production.up.railway.app/health`);
+  console.log(`   💬 Chat Base: https://propbotai-production.up.railway.app/api/chat`);
+  console.log(`   💬 Chat Test: https://propbotai-production.up.railway.app/api/chat/test`);
+  console.log(`   🏠 API Info: https://propbotai-production.up.railway.app/api\n`);
   
   console.log(`💡 Example Queries for Testing:`);
   console.log(`   🏠 "2BHK in Pune under 80 Lakh"`);
@@ -756,7 +772,7 @@ app.listen(PORT, () => {
   console.log(`   💰 "Properties under 1 Cr"\n`);
   
   console.log(`⚡ Usage Examples:`);
-  console.log(`   curl -X POST https://NoBrokerageai-production.up.railway.app/api/chat/message \\`);
+  console.log(`   curl -X POST https://propbotai-production.up.railway.app/api/chat/message \\`);
   console.log(`        -H "Content-Type: application/json" \\`);
   console.log(`        -d '{"message": "2BHK in Pune under 80 Lakh"}'\n`);
   
