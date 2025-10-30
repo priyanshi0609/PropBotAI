@@ -27,32 +27,8 @@ function ChatInterface() {
     await addMessage(example);
   };
 
-  const quickExamples = [
-    {
-      title: "2BHK in Pune under 80 Lakh",
-      description: "Find affordable 2BHK apartments",
-      icon: Home,
-      query: "2BHK in Pune under 80 Lakh"
-    },
-    {
-      title: "3BHK flats in Mumbai under 1.2 Cr", 
-      description: "Premium 3BHK apartments",
-      icon: Building2,
-      query: "3BHK flats in Mumbai under 1.2 Cr"
-    },
-    {
-      title: "Ready to move 1BHK in Pune",
-      description: "Immediate possession properties",
-      icon: CheckCircle,
-      query: "Ready to move 1BHK in Pune"
-    },
-    {
-      title: "Luxury apartments with pool & gym",
-      description: "High-end properties with amenities",
-      icon: Star,
-      query: "Luxury apartments with pool and gym in Mumbai"
-    }
-  ];
+  
+  
 
   return (
     <div className="flex flex-col h-screen bg-white dark:bg-gray-900">
@@ -75,34 +51,7 @@ function ChatInterface() {
                 </p>
               </div>
               
-              {/* Quick Examples */}
-              <div className="w-full max-w-2xl space-y-3 mb-8">
-                {quickExamples.map((example, index) => {
-                  const Icon = example.icon;
-                  return (
-                    <button
-                      key={index}
-                      onClick={() => handleExampleClick(example.query)}
-                      className="w-full text-left p-4 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 group"
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className="flex-shrink-0 w-10 h-10 bg-white dark:bg-gray-700 rounded-lg flex items-center justify-center border border-gray-200 dark:border-gray-600 group-hover:border-blue-300 dark:group-hover:border-blue-600 transition-colors">
-                          <Icon className="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors mb-0.5">
-                            {example.title}
-                          </div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {example.description}
-                          </div>
-                        </div>
-                        <ArrowUp className="w-4 h-4 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transform -rotate-45 transition-all opacity-0 group-hover:opacity-100" />
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+              
               
               {/* Features */}
               <div className="flex items-center justify-center space-x-6 text-sm text-gray-500 dark:text-gray-400">

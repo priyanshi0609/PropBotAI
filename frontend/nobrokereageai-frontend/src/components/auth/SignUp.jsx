@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { auth } from '../firebase'; // Adjust path to your firebase config
+import { auth } from '../../services/firebase';
 import { AlertCircle, Mail, Lock, User, Eye, EyeOff, UserPlus } from 'lucide-react';
 
 function SignUp() {
