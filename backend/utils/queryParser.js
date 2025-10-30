@@ -1,18 +1,18 @@
 class QueryParser {
   constructor() {
     // Supported BHK configurations from your CSV
-    this.supportedBHKs = ['1', '2', '3', '4', '5'];
+    this.supportedBHKs = ['1', '2', '3', '4', '5', '4.5', '1rk'];
     this.supportedBHKTypes = ['1BHK', '2BHK', '3BHK', '4BHK', '5BHK', '4.5BHK', '1RK'];
     
     // Extended BHK mappings for different formats
     this.bhkMappings = {
-      '1': ['1', '1bhk', 'one', 'single', '1 bhk', '1 bedroom'],
-      '2': ['2', '2bhk', 'two', 'double', '2 bhk', '2 bedroom'],
-      '3': ['3', '3bhk', 'three', 'triple', '3 bhk', '3 bedroom'],
-      '4': ['4', '4bhk', 'four', '4 bhk', '4 bedroom'],
-      '5': ['5', '5bhk', 'five', '5 bhk', '5 bedroom'],
-      '4.5': ['4.5', '4.5bhk', 'four point five', '4.5 bhk'],
-      '1RK': ['1rk', '1 rk', 'rk', 'room kitchen']
+      '1': ['1', '1bhk', 'one', 'single', '1 bhk', '1 bedroom', '1bedroom', '1bed'],
+      '2': ['2', '2bhk', 'two', 'double', '2 bhk', '2 bedroom', '2bedroom', '2bed'],
+      '3': ['3', '3bhk', 'three', 'triple', '3 bhk', '3 bedroom', '3bedroom', '3bed'],
+      '4': ['4', '4bhk', 'four', '4 bhk', '4 bedroom', '4bedroom', '4bed'],
+      '5': ['5', '5bhk', 'five', '5 bhk', '5 bedroom', '5bedroom', '5bed'],
+      '4.5': ['4.5', '4.5bhk', 'four point five', '4.5 bhk', '4.5bedroom'],
+      '1RK': ['1rk', '1 rk', 'rk', 'room kitchen', '1roomkitchen']
     };
     
     this.supportedCities = ['pune', 'mumbai'];
@@ -152,6 +152,131 @@ class QueryParser {
     return filters;
   }
 
+  // **FIXED: Enhanced BHK extraction with better case handling**
+  extractExactBHK(query) {
+    console.log('🛏️ Extracting BHK from:', query);
+
+    // **FIX: Extract ranges first**
+    const range = this.extractBHKRange(query);
+    if (range) {
+      console.log(`✅ Found BHK range: ${range.values.join('-')}BHK`);
+      return range.values[0]; // Return first BHK for initial filtering
+    }
+
+    const bhkPatterns = [
+      // **FIXED: More comprehensive patterns with case-insensitive matching**
+      /\b(\d(?:\.\d)?)\s*bhk\b/i,
+      /\b(\d(?:\.\d)?)bhk\b/i,
+      /\b(\d(?:\.\d)?)\s*bedroom\b/i,
+      /\b(\d(?:\.\d)?)\s*bed\s*room\b/i,
+      /\b(\d(?:\.\d)?)\s*bed\b/i,
+      /\b(\d)\s*rk\b/i,
+      /\b(\d)rk\b/i,
+      /\broom\s*kitchen\b/i,
+      // **NEW: Handle cases like "3 BHK", "3BHK", "3 bhk" etc.**
+      /\b(\d)\s*b\s*h\s*k\b/i,
+      /\b(\d)\s*b\s*h\s*k\b/i,
+    ];
+
+    for (const pattern of bhkPatterns) {
+      const match = query.match(pattern);
+      if (match) {
+        let bhk = match[1];
+        
+        // **FIX: Handle 1RK specifically**
+        if (query.includes('rk') || query.includes('room kitchen')) {
+          console.log(`✅ Found 1RK`);
+          return '1rk';
+        }
+
+        // **FIX: Validate the extracted BHK is supported**
+        if (this.isSupportedBHK(bhk)) {
+          console.log(`✅ Found valid BHK: ${bhk}BHK`);
+          return bhk;
+        } else {
+          console.log(`❌ Extracted BHK ${bhk} is not supported`);
+        }
+      }
+    }
+
+    // **NEW: Try direct BHK mapping for common patterns**
+    for (const [supportedBHK, variations] of Object.entries(this.bhkMappings)) {
+      for (const variation of variations) {
+        const pattern = new RegExp(`\\b${variation}\\b`, 'i');
+        if (pattern.test(query)) {
+          console.log(`✅ Found BHK via mapping: ${supportedBHK}BHK`);
+          return supportedBHK;
+        }
+      }
+    }
+
+    console.log('❌ No valid BHK found');
+    return null;
+  }
+
+  // **FIXED: Enhanced BHK range extraction**
+  extractBHKRange(query) {
+    const rangePatterns = [
+      // **FIX: More specific range patterns with better word boundaries**
+      /\b(\d)\s*(?:-|to|–)\s*(\d)\s*bhk\b/i,
+      /\b(\d)\s*(?:\/|or)\s*(\d)\s*bhk\b/i,
+      /\b(\d)\s*bhk\s*(?:or|\/)\s*(\d)\s*bhk\b/i,
+      /\b(\d)\s*(?:-|to|–)\s*(\d)\s*bedroom\b/i,
+    ];
+
+    for (const pattern of rangePatterns) {
+      const match = query.match(pattern);
+      if (match) {
+        const bhks = [match[1], match[2]].filter(bhk => 
+          this.isSupportedBHK(bhk)
+        );
+        
+        if (bhks.length >= 2) {
+          console.log(`✅ Found valid BHK range: ${bhks.join('-')}BHK`);
+          return {
+            isRange: true,
+            values: bhks,
+            originalText: match[0]
+          };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  // Apply fuzzy matching for typos
+  applyFuzzyMatching(query) {
+    let normalized = query;
+    
+    Object.keys(this.localityMappings).forEach(typo => {
+      const regex = new RegExp(`\\b${typo}\\b`, 'gi');
+      normalized = normalized.replace(regex, this.localityMappings[typo]);
+    });
+
+    // **FIXED: Better BHK normalization**
+    normalized = normalized
+      .replace(/\b(bhk|bh|bk|b h k|BHK|Bhk)\b/gi, 'bhk')
+      .replace(/\b(bedroom|bedrm|bed room|bed|bedrooms)\b/gi, 'bedroom')
+      .replace(/\b(crore|cr|cror)\b/gi, 'cr')
+      .replace(/\b(lakh|lac|lacks)\b/gi, 'lakh')
+      .replace(/\b(rk|r k|room kitchen)\b/gi, 'rk');
+
+    if (normalized !== query) {
+      console.log('🔧 Applied fuzzy matching:', query, '→', normalized);
+    }
+
+    return normalized;
+  }
+
+  // Check if BHK is supported in database
+  isSupportedBHK(bhk) {
+    // **FIXED: Better BHK validation**
+    const normalizedBHK = bhk.toString().toLowerCase();
+    return this.supportedBHKs.includes(normalizedBHK) || 
+           this.supportedBHKTypes.map(t => t.toLowerCase()).includes(normalizedBHK);
+  }
+
   // **NEW: Check for invalid BHK numbers (0, negative, etc.)**
   isInvalidBHK(bhk) {
     // Reject 0, negative numbers, and very large numbers
@@ -182,35 +307,6 @@ class QueryParser {
   hasClearBudgetContext(query) {
     const budgetKeywords = ['budget', 'price', 'cost', 'worth', 'value', 'amount'];
     return budgetKeywords.some(keyword => query.includes(keyword));
-  }
-
-  // Apply fuzzy matching for typos
-  applyFuzzyMatching(query) {
-    let normalized = query;
-    
-    Object.keys(this.localityMappings).forEach(typo => {
-      const regex = new RegExp(`\\b${typo}\\b`, 'gi');
-      normalized = normalized.replace(regex, this.localityMappings[typo]);
-    });
-
-    normalized = normalized
-      .replace(/\b(bhk|bh|bk|b h k)\b/gi, 'bhk')
-      .replace(/\b(bedroom|bedrm|bed room)\b/gi, 'bedroom')
-      .replace(/\b(crore|cr|cror)\b/gi, 'cr')
-      .replace(/\b(lakh|lac|lacks)\b/gi, 'lakh');
-
-    if (normalized !== query) {
-      console.log('🔧 Applied fuzzy matching:', query, '→', normalized);
-    }
-
-    return normalized;
-  }
-
-  // Check if BHK is supported in database
-  isSupportedBHK(bhk) {
-    return this.supportedBHKs.includes(bhk) || 
-           this.supportedBHKTypes.includes(bhk.toUpperCase()) ||
-           bhk === '4.5' || bhk === '1rk';
   }
 
   // Get available BHKs for display in error messages
@@ -297,77 +393,6 @@ class QueryParser {
       'bhopal', 'nagpur', 'kochi', 'coimbatore', 'visakhapatnam'
     ];
     return unsupportedCities.some(city => query.includes(city));
-  }
-
-  // **FIXED: Enhanced BHK extraction with better range handling**
-  extractExactBHK(query) {
-    console.log('🛏️ Extracting BHK from:', query);
-
-    // **FIX: Extract ranges first**
-    const range = this.extractBHKRange(query);
-    if (range) {
-      console.log(`✅ Found BHK range: ${range.values.join('-')}BHK`);
-      return range.values[0]; // Return first BHK for initial filtering
-    }
-
-    const bhkPatterns = [
-      // **FIX: More specific patterns with word boundaries**
-      /\b(\d(?:\.\d)?)\s*bhk\b/i,
-      /\b(\d(?:\.\d)?)bhk\b/i,
-      /\b(\d(?:\.\d)?)\s*bedroom\b/i,
-      /\b(\d(?:\.\d)?)\s*bed\b/i,
-      /\b(\d)\s*rk\b/i,
-      /\b(\d)rk\b/i,
-      /\broom\s*kitchen\b/i,
-    ];
-
-    for (const pattern of bhkPatterns) {
-      const match = query.match(pattern);
-      if (match) {
-        let bhk = match[1];
-        
-        // **FIX: Handle 1RK specifically**
-        if (query.includes('rk') || query.includes('room kitchen')) {
-          return '1RK';
-        }
-
-        console.log(`✅ Found BHK with pattern: ${bhk}BHK`);
-        return bhk;
-      }
-    }
-
-    // **FIX: Don't extract standalone numbers without BHK context**
-    return null;
-  }
-
-  // **FIXED: Enhanced BHK range extraction**
-  extractBHKRange(query) {
-    const rangePatterns = [
-      // **FIX: More specific range patterns**
-      /\b(\d)\s*(?:-|to|–)\s*(\d)\s*bhk\b/i,
-      /\b(\d)\s*(?:\/|or)\s*(\d)\s*bhk\b/i,
-      /\b(\d)\s*bhk\s*(?:or|\/)\s*(\d)\s*bhk\b/i,
-    ];
-
-    for (const pattern of rangePatterns) {
-      const match = query.match(pattern);
-      if (match) {
-        const bhks = [match[1], match[2]].filter(bhk => 
-          this.isSupportedBHK(bhk)
-        );
-        
-        if (bhks.length >= 2) {
-          console.log(`✅ Found valid BHK range: ${bhks.join('-')}BHK`);
-          return {
-            isRange: true,
-            values: bhks,
-            originalText: match[0]
-          };
-        }
-      }
-    }
-
-    return null;
   }
 
   // Extract ambiguous budgets (missing units)
