@@ -44,7 +44,7 @@ function ChatInterface() {
                   <Bot className="w-9 h-9 text-white" strokeWidth={2} />
                 </div>
                 <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">
-                  PropBot AI
+                  NoBrokerage AI
                 </h1>
                 <p className="text-lg text-gray-600 dark:text-gray-400 max-w-md mx-auto">
                   Your intelligent property assistant for Pune and Mumbai
@@ -118,7 +118,7 @@ function ChatInterface() {
             
             {/* Footer Text */}
             <p className="text-center text-xs text-gray-500 dark:text-gray-400 mt-3">
-              PropBot AI specializes in properties across Pune and Mumbai
+              NoBrokerage AI specializes in properties across Pune and Mumbai
             </p>
           </form>
         </div>
