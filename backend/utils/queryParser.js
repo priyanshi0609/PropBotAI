@@ -1,10 +1,10 @@
 class QueryParser {
   constructor() {
-    // Supported BHK configurations from your CSV
+   
     this.supportedBHKs = ['1', '2', '3', '4', '5', '4.5', '1rk'];
     this.supportedBHKTypes = ['1BHK', '2BHK', '3BHK', '4BHK', '5BHK', '4.5BHK', '1RK'];
     
-    // Extended BHK mappings for different formats
+   
     this.bhkMappings = {
       '1': ['1', '1bhk', 'one', 'single', '1 bhk', '1 bedroom', '1bedroom', '1bed'],
       '2': ['2', '2bhk', 'two', 'double', '2 bhk', '2 bedroom', '2bedroom', '2bed'],
@@ -24,7 +24,8 @@ class QueryParser {
       'it park': 'hinjewadi',
       'magarpatta city': 'magarpatta',
       'kalyani nagr': 'kalyani nagar',
-      'koregaon pk': 'koregaon park'
+      'koregaon pk': 'koregaon park',
+      'poone': 'pune'
     };
   }
 
