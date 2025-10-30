@@ -142,7 +142,7 @@ function Header() {
 
           {/* Mobile Menu Button */}
           <div className="flex md:hidden items-center space-x-2">
-            <ThemeToggle />
+            {/* <ThemeToggle /> */}
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="p-2 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200 cursor-pointer"
