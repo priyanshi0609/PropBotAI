@@ -27,9 +27,6 @@ function ChatInterface() {
     await addMessage(example);
   };
 
-  
-  
-
   return (
     <div className="flex flex-col h-screen bg-white dark:bg-gray-900">
       
@@ -50,8 +47,6 @@ function ChatInterface() {
                   Your intelligent property assistant for Pune and Mumbai
                 </p>
               </div>
-              
-              
               
               {/* Features */}
               <div className="flex items-center justify-center space-x-6 text-sm text-gray-500 dark:text-gray-400">
@@ -85,7 +80,7 @@ function ChatInterface() {
       </div>
 
       {/* Input Area - Fixed Bottom */}
-      <div className="sticky bottom-0 bg-gradient-to-t from-white via-white to-white/0 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900/0 pt-6 pb-8">
+      <div className="sticky bottom-0 bg-gradient-to-t from-white via-white to-white/0 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900/0 pt-6 pb-8 ">
         <div className="max-w-3xl mx-auto px-4">
           <form onSubmit={handleSend} className="relative">
             <div className="relative flex items-end bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 focus-within:border-blue-500 dark:focus-within:border-blue-500 transition-colors overflow-hidden">
@@ -95,7 +90,7 @@ function ChatInterface() {
                 onKeyDown={handleKeyPress}
                 placeholder="Message NoBrokerage AI..."
                 rows={1}
-                className="flex-1 resize-none bg-transparent px-4 py-4 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none text-[15px] max-h-[200px] overflow-y-auto"
+                className="flex-1 resize-none bg-transparent px-4 py-4 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none text-[15px] max-h-[200px] overflow-y-auto cursor-pointer"
                 style={{
                   minHeight: '56px',
                   scrollbarWidth: 'thin'
