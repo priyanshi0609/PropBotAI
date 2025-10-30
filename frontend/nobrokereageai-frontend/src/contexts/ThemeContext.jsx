@@ -14,7 +14,7 @@ export function ThemeProvider({ children }) {
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('NoBrokerage-theme');
+    const savedTheme = localStorage.getItem('propbot-theme');
     if (savedTheme) {
       setIsDark(savedTheme === 'dark');
     } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
@@ -23,7 +23,7 @@ export function ThemeProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('NoBrokerage-theme', isDark ? 'dark' : 'light');
+    localStorage.setItem('propbot-theme', isDark ? 'dark' : 'light');
     if (isDark) {
       document.documentElement.classList.add('dark');
     } else {

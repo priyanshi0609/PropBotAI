@@ -1,6 +1,6 @@
 // Application constants
 export const APP_CONFIG = {
-  name: 'NoBrokerage AI',
+  name: 'propbot AI',
   version: '1.0.0',
   description: 'Intelligent Property Search Assistant',
   supportedCities: ['Pune', 'Mumbai'],
@@ -16,9 +16,9 @@ export const APP_CONFIG = {
 
 // Local storage keys
 export const STORAGE_KEYS = {
-  THEME: 'NoBrokerage-theme',
-  USER_PREFERENCES: 'NoBrokerage-user-prefs',
-  CHAT_HISTORY: 'NoBrokerage-chat-history'
+  THEME: 'propbot-theme',
+  USER_PREFERENCES: 'propbot-user-prefs',
+  CHAT_HISTORY: 'propbot-chat-history'
 };
 
 // API endpoints

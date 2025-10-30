@@ -78,7 +78,7 @@ function Header() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-3">
-            <ThemeToggle />
+            {/* <ThemeToggle /> */}
 
             {/* User Menu */}
             <div className="relative" ref={userMenuRef}>
